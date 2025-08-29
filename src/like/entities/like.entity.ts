@@ -1,4 +1,4 @@
-import { User } from "src/user/entities/user.entity";
+import { User } from "src/user/entities/user-profile.entity";
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 import { UUID } from "typeorm/driver/mongodb/bson.typings";
 

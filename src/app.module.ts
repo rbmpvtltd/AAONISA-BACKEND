@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { AppDataSource } from '../data-source';
 import { UserModule } from './user/user.module';
 import { LikeModule } from './like/like.module';
 import { CommentModule } from './comment/comment.module';
 import { ShareModule } from './share/share.module';
+import { PostsModule } from './posts/posts.module';
+import { ReelsModule } from './reels/reels.module';
 
 @Module({
   imports: [
@@ -24,9 +24,11 @@ import { ShareModule } from './share/share.module';
     UserModule,
     LikeModule,
     CommentModule,
-    ShareModule
+    ShareModule,
+    PostsModule,
+    ReelsModule
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [],
+  providers: [],
 })
 export class AppModule { }
