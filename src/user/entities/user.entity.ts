@@ -11,7 +11,7 @@ export class User {
   @Column({ nullable: true }) // unique
   email: string;
 
-  @Column({ unique: true })
+  @Column({ unique: true }) 
   mobileNumber: string;
 
   @Column()

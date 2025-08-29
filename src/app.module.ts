@@ -5,6 +5,9 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppDataSource } from '../data-source';
 import { UserModule } from './user/user.module';
+import { LikeModule } from './like/like.module';
+import { CommentModule } from './comment/comment.module';
+import { ShareModule } from './share/share.module';
 
 @Module({
   imports: [
@@ -18,7 +21,10 @@ import { UserModule } from './user/user.module';
         })
       },
     }),
-    UserModule
+    UserModule,
+    LikeModule,
+    CommentModule,
+    ShareModule
   ],
   controllers: [AppController],
   providers: [AppService],
