@@ -2,12 +2,12 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { AppDataSource } from '../data-source';
-import { UserModule } from './user/user.module';
-import { LikeModule } from './like/like.module';
-import { CommentModule } from './comment/comment.module';
-import { ShareModule } from './share/share.module';
-import { PostsModule } from './posts/posts.module';
-import { ReelsModule } from './reels/reels.module';
+import { UserModule } from './modules/users/user.module';
+import { LikeModule } from './modules/likes/like.module';
+import { CommentModule } from './modules/comments/comment.module';
+import { ShareModule } from './modules/share/share.module';
+import { PostsModule } from './modules/posts/posts.module';
+import { ReelsModule } from './modules/reels/reels.module';
 
 @Module({
   imports: [
