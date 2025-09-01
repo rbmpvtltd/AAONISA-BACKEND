@@ -1,4 +1,4 @@
-import { Controller, Post, Delete, Get, Body, Param } from '@nestjs/common';
+import { Controller, Post, Delete, Get, Body, Param, ParseIntPipe } from '@nestjs/common';
 import { LikesService } from './like.service';
 import { CreateLikeDto } from './dto/create-like.dto';
 
@@ -6,18 +6,51 @@ import { CreateLikeDto } from './dto/create-like.dto';
 export class LikesController {
   constructor(private readonly likesService: LikesService) {}
 
-  @Post()
-  async likePost(@Body() createLikeDto: CreateLikeDto) {
-    return this.likesService.likePost(createLikeDto);
+  // Like post
+@Post('post/:postId')
+async likePost(
+  @Param('postId', ParseIntPipe) postId: number,
+  @Body() createLikeDto: CreateLikeDto,
+) {
+  return this.likesService.likePost(postId, createLikeDto);
+}
+
+//  Unlike post
+ @Delete('post/:postId')
+  async unlikePost(
+    @Param('postId', ) postId: string,
+    @Body('userId', ) userId: string,
+  ) {
+    return this.likesService.unlikePost(postId, userId);
   }
 
-  @Delete()
-  async unlikePost(@Body() body: { user_id: number; post_id: number }) {
-    return this.likesService.unlikePost(body.user_id, body.post_id);
+// Like reel
+@Post('post/:reelId')
+async likePost(
+  @Param('reelId', ParseIntPipe) reelId: number,
+  @Body() createLikeDto: CreateLikeDto,
+) {
+  return this.likesService.likePost(reelId, createLikeDto);
+}
+
+//  Unlike reel
+ @Delete('post/:reelId')
+  async unlikePost(
+    @Param('reelId', ) postId: string,
+    @Body('userId', ) userId: string,
+  ) {
+    return this.likesService.unlikePost(reelId, userId);
   }
 
-  @Get(':postId')
-  async getLikesCount(@Param('postId') postId: number) {
-    return { likes: await this.likesService.countLikes(postId) };
+//  Get users who liked post
+  @Get('/post/:postId')
+  async  GetUsersWhoLikedPost(@Param('postId') postId: string) {
+    return { likes: await this.likesService.GetUsersWhoLikedPost(postId) };
+  }
+
+  //  Get users who liked reel
+  @Get('/post/:reelId')
+  async  GetUsersWhoLikedPost(@Param('reelId') postId: string) {
+    return { likes: await this.likesService.GetUsersWhoLikedPost(reelId) };
   }
 }

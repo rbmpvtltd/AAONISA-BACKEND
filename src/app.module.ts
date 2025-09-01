@@ -8,6 +8,7 @@ import { CommentModule } from './modules/comments/comment.module';
 import { ShareModule } from './modules/share/share.module';
 import { PostsModule } from './modules/posts/posts.module';
 import { ReelsModule } from './modules/reels/reels.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -26,7 +27,8 @@ import { ReelsModule } from './modules/reels/reels.module';
     CommentModule,
     ShareModule,
     PostsModule,
-    ReelsModule
+    ReelsModule,
+    SearchModule
   ],
   controllers: [],
   providers: [],

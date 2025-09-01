@@ -7,28 +7,33 @@ import { UpdateReelDto } from './dto/update-reel.dto';
 export class ReelsController {
   constructor(private readonly reelsService: ReelsService) {}
 
+  //  Reels Module
+// Upload new reel
   @Post()
-  create(@Body() createReelDto: CreateReelDto) {
-    return this.reelsService.create(createReelDto);
+  uploadNewReel(@Body() createReelDto: CreateReelDto) {
+    return this.reelsService.uploadNewReel(createReelDto);
   }
 
-  @Get()
-  findAll() {
-    return this.reelsService.findAll();
-  }
-
+  //  Get single reel
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.reelsService.findOne(+id);
+  getSingleReel(@Param('id') id: number) {
+    return this.reelsService.getSingleReel(id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateReelDto: UpdateReelDto) {
-    return this.reelsService.update(+id, updateReelDto);
+  //  Get recommended reels (paginated)
+  @Get('/feed')
+  getRecommended(@Param('feed') feed: string ) {
+    return this.reelsService.findOne(+feed);
   }
+  
+  // Delete reel
+    @Delete(':id')
+    deleteReel(@Param('id') id: number) {
+      return this.reelsService.deleteReel(+id);
+    }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.reelsService.remove(+id);
+  @Post(':id/share')
+  shareReels(@Param('id') id: number) {
+    return this.reelsService.shareReels(id);
   }
 }
