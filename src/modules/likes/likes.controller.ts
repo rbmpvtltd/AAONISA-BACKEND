@@ -1,5 +1,5 @@
 import { Controller, Post, Delete, Get, Body, Param, ParseIntPipe } from '@nestjs/common';
-import { LikesService } from './like.service';
+import { LikesService } from './likes.service';
 import { CreateLikeDto } from './dto/create-like.dto';
 
 @Controller('likes')
