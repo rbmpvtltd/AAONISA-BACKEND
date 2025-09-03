@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateReelDto } from './create-reel.dto';
+// import { PartialType } from '@nestjs/mapped-types';
+// import { CreateReelDto } from './create-reel.dto';
 
-export class UpdateReelDto extends PartialType(CreateReelDto) {}
+// export class UpdateReelDto extends PartialType(CreateReelDto) {}

@@ -1,46 +1,51 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+// src/auth/auth.controller.ts
+import { Body, Controller, Post, Req, UseGuards, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { CreateAuthDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
-
+import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/create-auth.dto';
+import { JwtAuthGuard } from './guards/jwt.guard';
+import { RolesGuard } from './guards/role.guard';
+import { Roles } from 'src/common/utils/decorators';
+import { Response } from 'express';
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
-  // Register new user
+
   @Post('register')
-  register(@Body() createAuthDto: CreateAuthDto) {
-    return this.authService.register(createAuthDto);
+  async register(@Body() dto: RegisterDto, @Res() res: Response) {
+    console.log('hi');
+    await this.authService.register(dto, res);
   }
 
-  // Login user & get JWT
   @Post('login')
-  login(@Body() loginDto: LoginAuthDto) {
-    return this.authService.login(loginDto);
+  login(@Body() dto: LoginDto, @Res() res: Response) {
+    return this.authService.login(dto, res);
   }
 
-  // Logout user
+  @UseGuards(JwtAuthGuard)
   @Post('logout')
-  logout(@Body('userId') userId: number) {
-    return this.authService.logout(userId);
+  async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    await this.authService.logout(req.user.userId);
+
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+
+    return { message: 'Logged out successfully' };
   }
 
-  // Refresh JWT token
+  @UseGuards(JwtAuthGuard)
   @Post('refresh-token')
-  refreshToken(@Body('refreshToken') refreshToken: string) {
-    return this.authService.refreshToken(refreshToken);
+  async refresh(@Body('oldRefreshToken') oldRefreshToken: string, @Req() req) {
+    return this.authService.refreshToken(req.user.id, oldRefreshToken);
   }
 
-  // Request forgot-password link
   @Post('forgot-password')
-  forgotPassword(@Body() forgotDto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(forgotDto);
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
   }
 
-  // Reset password
   @Post('reset-password')
-  resetPassword(@Body() resetDto: ResetPasswordDto) {
-    return this.authService.resetPassword(resetDto);
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    this.authService.resetPassword(dto);
   }
-
 }
