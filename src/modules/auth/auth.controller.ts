@@ -10,7 +10,7 @@ import { Response } from 'express';
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
-  // @UseGuards(JwtAuthGuard, RolesGuard)
+
   @Post('register')
   async register(@Body() dto: RegisterDto, @Res() res: Response) {
     console.log('hi');
@@ -23,21 +23,21 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
-@Post('logout')
-async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
-  await this.authService.logout(req.user.userId);
+  @Post('logout')
+  async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    await this.authService.logout(req.user.userId);
 
-  res.clearCookie('accessToken');
-  res.clearCookie('refreshToken');
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
 
-  return { message: 'Logged out successfully' };
-}
+    return { message: 'Logged out successfully' };
+  }
 
   @UseGuards(JwtAuthGuard)
-@Post('refresh-token')
-async refresh(@Body('oldRefreshToken') oldRefreshToken: string, @Req() req) {
-  return this.authService.refreshToken(req.user.id, oldRefreshToken);
-}
+  @Post('refresh-token')
+  async refresh(@Body('oldRefreshToken') oldRefreshToken: string, @Req() req) {
+    return this.authService.refreshToken(req.user.id, oldRefreshToken);
+  }
 
   @Post('forgot-password')
   forgotPassword(@Body() dto: ForgotPasswordDto) {
@@ -46,7 +46,6 @@ async refresh(@Body('oldRefreshToken') oldRefreshToken: string, @Req() req) {
 
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) {
-    
- this.authService.resetPassword(dto);
+    this.authService.resetPassword(dto);
   }
 }

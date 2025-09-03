@@ -6,12 +6,16 @@ import { Request } from 'express';
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {
+    if (!process.env.SECRET_KEY) {
+      throw new Error('SECRET_KEY environment variable is not set');
+    }
+
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: Request) => req?.cookies?.accessToken
       ]),
       ignoreExpiration: false,
-      secretOrKey: 'SECRET_KEY',
+      secretOrKey: process.env.SECRET_KEY,
     });
   }
   async validate(payload: any) {

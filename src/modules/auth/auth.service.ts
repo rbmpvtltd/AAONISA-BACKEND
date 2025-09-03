@@ -28,7 +28,7 @@ export class AuthService {
     });
     const savedUser = await this.usersRepo.save(user);
 
-    // --- Generate Tokens ---
+    // --- generate tokens ---
     const payload = { sub: savedUser.id, email: savedUser.email, username: savedUser.username, role: savedUser.role };
     const accessToken = this.jwtService.sign(payload, { expiresIn: process.env.ACCESS_TOKEN_EXPIRY_IN });
     const refreshToken = this.jwtService.sign(payload, { expiresIn: process.env.REFRESH_TOKEN_EXPIRY_IN });

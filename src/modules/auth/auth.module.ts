@@ -12,8 +12,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     TypeOrmModule.forFeature([User]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret: 'SECRET_KEY', // .env se use karo
-      signOptions: { expiresIn: '1h' },
+      secret: process.env.SECRET_KEY, 
+      signOptions: { expiresIn: process.env.JWT_EXPIRES },
     }),
   ],
 controllers: [AuthController],
