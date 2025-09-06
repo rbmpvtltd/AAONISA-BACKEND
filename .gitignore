@@ -6,7 +6,7 @@
 /build
 
 # production
-/.env
+# /.env
 /.env.*.local
 
 # debug
