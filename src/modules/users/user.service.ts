@@ -31,6 +31,8 @@ export class UserService {
     });
 
     const savedUser = await this.userRepository.save(user);
+    const userProfile = this.userProfileRepository.create({ user_id: savedUser.id, role: dto.role, paid: false, star: 1 });
+    const savedProfile = await this.userProfileRepository.save(userProfile);
     const tokens = this.authService.generateTokens({ sub: savedUser.id });
 
     savedUser.refreshToken = await bcrypt.hash(tokens.refreshToken, 10);
@@ -85,8 +87,6 @@ export class UserService {
     user.resetToken = await bcrypt.hash(resetToken, 10);
     user.resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
     await this.userRepository.save(user);
-    console.log('resetToken',resetToken)
-    // TODO: Email logic
     return { message: 'Reset link sent to your email', token: resetToken };
   }
 

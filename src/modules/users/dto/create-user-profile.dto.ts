@@ -1,7 +1,7 @@
 import { IsBoolean, IsEmail, IsNotEmpty, IsOptional,IsEnum, IsString, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { StarLevel } from '../entities/user-profile.entity';
-export class CreateUserDto {
+export class CreateUserProfileDto {
     @IsNotEmpty()
     @IsString()
     @ApiProperty({ example: 'user' })

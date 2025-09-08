@@ -12,16 +12,19 @@ export class UserProfile {
   id: string;
 
   @Column({ unique: true })
-  userName: string;
+  user_id: string;
+  
+  // @Column({ unique: true })
+  // userName: string;
 
-  @Column({ nullable: true })
-  email: string;
+  // @Column({ nullable: true })
+  // email: string;
 
-  @Column({ unique: true }) 
-  mobileNumber: string;
+  // @Column({ unique: true }) 
+  // mobileNumber: string;
 
-  @Column()
-  password: string;
+  // @Column()
+  // password: string;
 
   @Column({ type: 'boolean', default: false })
   paid: boolean;
