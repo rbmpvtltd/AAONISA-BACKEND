@@ -1,14 +1,20 @@
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+export enum StarLevel {
+  'none' = 0,
+  'bronze' = 1,
+  'silver' = 2,
+  'gold' = 3
+}
 
 @Entity()
-export class User {
+export class UserProfile {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ unique: true })
   userName: string;
 
-  @Column({ nullable: true }) // unique
+  @Column({ nullable: true })
   email: string;
 
   @Column({ unique: true }) 
@@ -23,6 +29,6 @@ export class User {
   @Column({ type: 'varchar', default: 'user' })
   role: string;
 
-  @Column({ default: 'none' })
-  star: string;
+  @Column({type:'enum', enum:StarLevel, default: StarLevel.none })
+  star: StarLevel;
 }

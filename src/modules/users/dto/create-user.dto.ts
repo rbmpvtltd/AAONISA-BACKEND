@@ -1,25 +1,46 @@
-import { IsBoolean, IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { UserRole } from '../entities/user.entity';
 
-export class CreateUserDto {
-    @IsNotEmpty()
-    @IsString()
-    @ApiProperty({ example: 'user' })
-    userName: string;
+export class RegisterDto {
+  @IsEmail()
+  email: string;
 
-    @IsEmail()
-    @ApiProperty({ example: '0123456789' })
-    mobileNumber: string;
+  @IsString()
+  phone_no: string;
+  
+  @IsString()
+  @MinLength(6)
+  password: string;
 
-    @ApiProperty({ example: 'password1234' })
-    password: string;
+  @IsOptional()
+  @IsString()
+  username?: string;
 
-    @IsBoolean()
-    paid: boolean;
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole = UserRole.USER;
+}
 
-    @IsString()
-    role: string;
+export class LoginDto {
+  @IsEmail()
+  email: string;
 
-    @IsString()
-    star: string;
+  @IsString()
+  password: string;
+
+  resetTokenExpiry: Date;
+}
+
+export class ForgotPasswordDto {
+  @IsEmail()
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @IsString()
+  token: string;
+
+  @IsString()
+  @MinLength(6)
+  newPassword: string;
 }
