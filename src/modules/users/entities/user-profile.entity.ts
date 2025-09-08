@@ -13,9 +13,9 @@ export class UserProfile {
 
   @Column({ unique: true })
   user_id: string;
-  
-  // @Column({ unique: true })
-  // userName: string;
+
+  @Column({nullable:true})
+  profileName: string;
 
   // @Column({ nullable: true })
   // email: string;

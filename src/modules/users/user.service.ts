@@ -31,7 +31,7 @@ export class UserService {
     });
 
     const savedUser = await this.userRepository.save(user);
-    const userProfile = this.userProfileRepository.create({ user_id: savedUser.id, role: dto.role, paid: false, star: 1 });
+    const userProfile = this.userProfileRepository.create({ user_id: savedUser.id, role: dto.role, paid: false, star: 1, profileName:'aao_ni_saa_user' });
     const savedProfile = await this.userProfileRepository.save(userProfile);
     const tokens = this.authService.generateTokens({ sub: savedUser.id });
 
