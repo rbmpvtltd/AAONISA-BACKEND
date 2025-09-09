@@ -3,10 +3,11 @@ import { UserService } from './user.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto/create-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { Response } from 'express';
+import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
 
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly userService: UserService) { }
 
   @Post('register')
   register(@Body() dto: RegisterDto, @Res() res: Response) {
@@ -38,5 +39,9 @@ export class UserController {
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.userService.resetPassword(dto);
+  }
+  @Post('verify-otp')
+  verifyOtp(@Body() dto: VerifyOtpDto) {
+    return this.userService.verifyOtp(dto);
   }
 }

@@ -9,7 +9,10 @@ import * as crypto from 'crypto';
 import { UserProfile } from './entities/user-profile.entity';
 import { User } from './entities/user.entity';
 import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/create-user.dto';
+import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
 import { AuthService } from '../auth/auth.service';
+import { OtpService } from '../otp/otp.service';
+
 
 @Injectable()
 export class UserService {
@@ -19,7 +22,8 @@ export class UserService {
     @InjectRepository(UserProfile)
     private readonly userProfileRepository: Repository<UserProfile>,
     private readonly authService: AuthService,
-  ) {}
+    private readonly otpService: OtpService,
+  ) { }
 
   async register(dto: RegisterDto, res: Response) {
     const hashedPassword = await bcrypt.hash(dto.password, 10);
@@ -31,7 +35,7 @@ export class UserService {
     });
 
     const savedUser = await this.userRepository.save(user);
-    const userProfile = this.userProfileRepository.create({ user_id: savedUser.id, role: dto.role, paid: false, star: 1, profileName:'aao_ni_saa_user' });
+    const userProfile = this.userProfileRepository.create({ user_id: savedUser.id, role: dto.role, paid: false, star: 1, profileName: 'aao_ni_saa_user' });
     const savedProfile = await this.userProfileRepository.save(userProfile);
     const tokens = this.authService.generateTokens({ sub: savedUser.id });
 
@@ -79,40 +83,61 @@ export class UserService {
     return tokens;
   }
 
+  // async forgotPassword(dto: ForgotPasswordDto) {
+  //   const user = await this.userRepository.findOne({ where: { email: dto.email } });
+  //   if (!user) throw new NotFoundException('User not found');
+
+  //   const resetToken = crypto.randomBytes(32).toString('hex');
+  //   user.resetToken = await bcrypt.hash(resetToken, 10);
+  //   user.resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
+  //   await this.userRepository.save(user);
+  //   return { message: 'Reset link sent to your email', token: resetToken };
+  // }
+
   async forgotPassword(dto: ForgotPasswordDto) {
     const user = await this.userRepository.findOne({ where: { email: dto.email } });
     if (!user) throw new NotFoundException('User not found');
 
+    const otp = await this.otpService.generateOtp(user.id);
+    return {
+      message: 'OTP sent to your email/phone',
+      otp,
+    };
+  }
+  async verifyOtp(dto: VerifyOtpDto) {
+    const user = await this.userRepository.findOne({ where: { email: dto.email } });
+    if (!user) throw new NotFoundException('User not found');
+    const isValid = await this.otpService.validateOtp(user.id, dto.code);
+    if (!isValid) throw new BadRequestException('Invalid OTP');
     const resetToken = crypto.randomBytes(32).toString('hex');
     user.resetToken = await bcrypt.hash(resetToken, 10);
     user.resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
     await this.userRepository.save(user);
-    return { message: 'Reset link sent to your email', token: resetToken };
+    return { message: 'otp verified successfully', token: resetToken };
   }
-
   async resetPassword(dto: ResetPasswordDto) {
-  const users = await this.userRepository.find();
+    const users = await this.userRepository.find();
 
-  const user = users.find(u =>
-    u.resetToken &&
-    u.resetTokenExpiry &&
-    bcrypt.compareSync(dto.token, u.resetToken)
-  );
+    const user = users.find(u =>
+      u.resetToken &&
+      u.resetTokenExpiry &&
+      bcrypt.compareSync(dto.token, u.resetToken)
+    );
 
-  if (
-    !user ||
-    !(user.resetTokenExpiry instanceof Date) ||
-    user.resetTokenExpiry.getTime() < Date.now()
-  ) {
-    throw new UnauthorizedException('Invalid or expired token');
+    if (
+      !user ||
+      !(user.resetTokenExpiry instanceof Date) ||
+      user.resetTokenExpiry.getTime() < Date.now()
+    ) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    user.password = await bcrypt.hash(dto.newPassword, 10);
+    user.resetToken = null;
+    user.resetTokenExpiry = null;
+    await this.userRepository.save(user);
+
+    return { message: 'Password reset successfully' };
   }
-
-  user.password = await bcrypt.hash(dto.newPassword, 10);
-  user.resetToken = null;
-  user.resetTokenExpiry = null;
-  await this.userRepository.save(user);
-
-  return { message: 'Password reset successfully' };
-}
 
 }
