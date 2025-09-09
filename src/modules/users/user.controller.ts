@@ -1,6 +1,7 @@
 import { Body, Controller, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { UserService } from './user.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto/create-user.dto';
+import { UpdateUserProfileDto } from './dto/update-user-profile.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { Response } from 'express';
 import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
@@ -43,5 +44,11 @@ export class UserController {
   @Post('verify-otp')
   verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.userService.verifyOtp(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('update-profile')
+  updateProfile(@Req() req, @Body() dto: UpdateUserProfileDto) {
+    return this.userService.updateProfile(dto);
   }
 }

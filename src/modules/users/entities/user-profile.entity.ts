@@ -14,17 +14,11 @@ export class UserProfile {
   @Column({ unique: true })
   user_id: string;
 
-  @Column({nullable:true})
-  profileName: string;
+  @Column({default : '',nullable: true})
+  avatar : string;
 
-  // @Column({ nullable: true })
-  // email: string;
-
-  // @Column({ unique: true }) 
-  // mobileNumber: string;
-
-  // @Column()
-  // password: string;
+  @Column({default : '',nullable: true})
+  bio : string;
 
   @Column({ type: 'boolean', default: false })
   paid: boolean;

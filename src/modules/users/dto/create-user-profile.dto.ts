@@ -24,3 +24,4 @@ export class CreateUserProfileDto {
     @IsEnum(StarLevel)
     star?: StarLevel= StarLevel.none;
 }
+

@@ -9,6 +9,7 @@ import * as crypto from 'crypto';
 import { UserProfile } from './entities/user-profile.entity';
 import { User } from './entities/user.entity';
 import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/create-user.dto';
+import { UpdateUserProfileDto } from './dto/update-user-profile.dto'
 import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
 import { AuthService } from '../auth/auth.service';
 import { OtpService } from '../otp/otp.service';
@@ -39,7 +40,7 @@ export class UserService {
     });
 
     const savedUser = await this.userRepository.save(user);
-    const userProfile = this.userProfileRepository.create({ user_id: savedUser.id, role: dto.role, paid: false, star: 1, profileName: 'aao_ni_saa_user' });
+    const userProfile = this.userProfileRepository.create({ user_id: savedUser.id, role: dto.role, paid: false, star: 1 });
     const savedProfile = await this.userProfileRepository.save(userProfile);
     const tokens = this.authService.generateTokens({ sub: savedUser.id });
 
@@ -54,6 +55,7 @@ export class UserService {
 
   async login(dto: LoginDto, res: Response) {
     const user = await this.userRepository.findOne({ where: { email: dto.email } });
+
     if (!user || !(await bcrypt.compare(dto.password, user.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -65,7 +67,7 @@ export class UserService {
     res.cookie('accessToken', tokens.accessToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 15 * 60 * 1000 });
     res.cookie('refreshToken', tokens.refreshToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000 });
 
-    return res.status(200).json({ message: 'Login successful' });
+    return res.status(200).json({ message: 'Login successful', accessToken: tokens.accessToken });
   }
 
   async logout(userId: string, res: Response) {
@@ -145,4 +147,24 @@ export class UserService {
     return { message: 'Password reset successfully' };
   }
 
-}
+
+  async updateProfile(dto: UpdateUserProfileDto) {
+    const payload = await this.authService.verifyToken(dto.token);
+    const userId = payload?.sub || payload?.id || payload.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+    const user = await this.userProfileRepository.findOne({ where: { user_id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    Object.assign(user, dto);
+    await this.userProfileRepository.save(user);
+
+    return {
+      message: 'Profile updated successfully',
+      user,
+    };
+  }
+} 
