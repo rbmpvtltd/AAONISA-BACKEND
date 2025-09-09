@@ -12,6 +12,7 @@ import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dt
 import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
 import { AuthService } from '../auth/auth.service';
 import { OtpService } from '../otp/otp.service';
+import { EmailService } from '../otp/EmailService';
 
 
 @Injectable()
@@ -23,6 +24,7 @@ export class UserService {
     private readonly userProfileRepository: Repository<UserProfile>,
     private readonly authService: AuthService,
     private readonly otpService: OtpService,
+    private readonly emailService: EmailService
   ) { }
 
   async register(dto: RegisterDto, res: Response) {
@@ -99,6 +101,7 @@ export class UserService {
     if (!user) throw new NotFoundException('User not found');
 
     const otp = await this.otpService.generateOtp(user.id);
+    await this.emailService.sendOtp(user.email, otp); 
     return {
       message: 'OTP sent to your email/phone',
       otp,
