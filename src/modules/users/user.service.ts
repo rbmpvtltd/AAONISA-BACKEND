@@ -216,8 +216,7 @@ export class UserService {
     await this.userRepository.save(user);
 
     return {
-      message: 'Profile updated successfully',
-      user,
+      message: 'Profile updated successfully'
     };
   }
 
