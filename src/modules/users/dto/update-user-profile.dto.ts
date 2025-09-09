@@ -1,5 +1,4 @@
-import { IsBoolean, IsEmail, IsNotEmpty, IsOptional,IsEnum, IsString, MinLength } from 'class-validator';
-import { CreateUserProfileDto } from './create-user-profile.dto';
+import {IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class UpdateUserProfileDto{
     @IsNotEmpty()

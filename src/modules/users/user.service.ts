@@ -10,6 +10,7 @@ import { UserProfile } from './entities/user-profile.entity';
 import { User } from './entities/user.entity';
 import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/create-user.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto'
+import { UpdateUserDto } from './dto/update-user.dto'
 import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
 import { AuthService } from '../auth/auth.service';
 import { OtpService } from '../otp/otp.service';
@@ -167,4 +168,57 @@ export class UserService {
       user,
     };
   }
+
+  async updateUser(dto: UpdateUserDto) {
+    const payload = await this.authService.verifyToken(dto.token);
+    const userId = payload?.sub || payload?.id || payload.userId;
+    if (!userId) throw new UnauthorizedException('Invalid token');
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    const { email, phone_no, username } = dto;
+    if (!email && !phone_no && !username) {
+      throw new BadRequestException('No fields provided to update');
+    }
+
+    const errors: Record<string, string> = {};
+    if (email) {
+      const existingEmail = await this.userRepository.findOne({ where: { email } });
+      if (existingEmail && existingEmail.id !== user.id) {
+        errors.email = 'Email already in use';
+      }
+    }
+
+    if (phone_no) {
+      const existingPhone = await this.userRepository.findOne({ where: { phone_no } });
+      if (existingPhone && existingPhone.id !== user.id) {
+        errors.phone_no = 'Phone number already in use';
+      }
+    }
+
+    if (username) {
+      const existingUsername = await this.userRepository.findOne({ where: { username } });
+      if (existingUsername && existingUsername.id !== user.id) {
+        errors.username = 'Username already in use';
+      }
+    }
+    if (Object.keys(errors).length > 0) {
+      return {
+        message: 'Some fields are already taken',
+        errors,
+      };
+    }
+
+    if (email) user.email = email;
+    if (phone_no) user.phone_no = phone_no;
+    if (username) user.username = username;
+
+    await this.userRepository.save(user);
+
+    return {
+      message: 'Profile updated successfully',
+      user,
+    };
+  }
+
 } 

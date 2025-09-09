@@ -2,6 +2,7 @@ import { Body, Controller, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { UserService } from './user.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto/create-user.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto'
+import { UpdateUserDto } from './dto/update-user.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { Response } from 'express';
 import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
@@ -50,5 +51,10 @@ export class UserController {
   @Post('update-profile')
   updateProfile(@Req() req, @Body() dto: UpdateUserProfileDto) {
     return this.userService.updateProfile(dto);
+  }
+  @UseGuards(JwtAuthGuard)
+  @Post('update-user')
+  updateUser(@Req() req, @Body() dto: UpdateUserDto) {
+    return this.userService.updateUser(dto);
   }
 }
