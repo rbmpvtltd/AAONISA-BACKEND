@@ -118,10 +118,10 @@ export class UserService {
 
 
   async login(dto: LoginDto, res: Response) {
-    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.identifier);
 
     const user = await this.userRepository.findOne({
-      where: isEmail ? { email: dto.emailOrPhone } : { phone_no: dto.emailOrPhone },
+      where: isEmail ? { email: dto.identifier } : { phone_no: dto.identifier },
     });
 
     if (!user || !(await bcrypt.compare(dto.password, user.password))) {
@@ -183,19 +183,36 @@ export class UserService {
   }
 
 
-  async verifyOtp(dto: { email?: string; phone_no?: string; code: string }) {
-    const isValid = await this.otpService.validateOtp({
-      email: dto.email,
-      phone_no: dto.phone_no,
-      code: dto.code,
-    });
+  async verifyOtp(dto: { emailOrPhone?: string; code: string }) {
 
-    if (!isValid) {
-      throw new BadRequestException('Invalid or expired OTP');
-    }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phoneRegex = /^\d{10}$/;
 
-    return { message: 'OTP verified successfully', success: true };
+  let email: string | undefined;
+  let phone_no: string | undefined;
+  if (dto.emailOrPhone && emailRegex.test(dto.emailOrPhone)) {
+    email = dto.emailOrPhone;
+  } else if (dto.emailOrPhone && phoneRegex.test(dto.emailOrPhone)) {
+    phone_no = dto.emailOrPhone;
+  } else {
+    throw new BadRequestException('Invalid email or phone number format');
   }
+  console.log(email, phone_no);
+  const user = await this.userRepository.findOne({ where: { email: email, phone_no: phone_no } }); if (!user) throw new NotFoundException('User not found');
+  
+  const isValid = await this.otpService.validateOtp({
+    email,
+    phone_no,
+    code: dto.code,
+  });
+  if (!isValid) {
+    throw new BadRequestException('Invalid or expired OTP');
+  }
+  const resetToken = crypto.randomBytes(32).toString('hex'); user.resetToken = await bcrypt.hash(resetToken, 10); user.resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
+  await this.userRepository.save(user);
+  return { message: 'OTP verified successfully',token:resetToken, success: true };
+}
+
 
   async resetPassword(dto: ResetPasswordDto) {
     const users = await this.userRepository.find();

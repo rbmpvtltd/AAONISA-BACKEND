@@ -49,7 +49,15 @@ export class OtpService {
 
   await this.otpRepository.save(otp);
   setTimeout(async () => {
-    await this.otpRepository.delete({ userId, email, phone_no });
+    await this.otpRepository
+  .createQueryBuilder()
+  .delete()
+  .from(Otp)
+  .where("userId = :userId", { userId })
+  .orWhere("email = :email", { email })
+  .orWhere("phone_no = :phone_no", { phone_no })
+  .execute();
+
     this.logger?.log(`OTP cleanup done after 1 minute`);
   }, 60 * 1000);
 

@@ -58,12 +58,12 @@ export class RegisterDto {
 export class LoginDto {
   @IsString()
   @Validate(IsEmailOrPhoneConstraint)
-  emailOrPhone: string;
+  identifier: string;
 
   @IsString()
   password: string;
 
-  resetTokenExpiry: Date; // Assuming this is for internal use; no validation needed?
+  // resetTokenExpiry: Date; // Assuming this is for internal use; no validation needed?
 }
 export class ForgotPasswordDto {
   @IsString()
