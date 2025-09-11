@@ -2,8 +2,9 @@
 import { IsUUID, IsString, Length, IsEmail } from 'class-validator';
 
 export class VerifyOtpDto {
-  // @IsUUID()
-  // userId: string;
+  @IsString()
+  phone_no: string;
+  
   @IsEmail()
   email: string;
   

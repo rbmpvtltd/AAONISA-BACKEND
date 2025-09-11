@@ -1,6 +1,6 @@
 import { Body, Controller, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { UserService } from './user.service';
-import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto/create-user.dto';
+import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, PreRegisterDto } from './dto/create-user.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
@@ -11,9 +11,14 @@ import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
 export class UserController {
   constructor(private readonly userService: UserService) { }
 
-  @Post('register')
-  register(@Body() dto: RegisterDto, @Res() res: Response) {
-    return this.userService.register(dto, res);
+  @Post('register-check')
+  registerCheck(@Body() dto: PreRegisterDto) {
+    return this.userService.preRegisterCheck(dto);
+  }
+
+  @Post('verify-otp-and-register')
+  register(@Body() dto: RegisterDto,@Res() res:Response) {
+    return this.userService.register(dto,res);
   }
 
   @Post('login')

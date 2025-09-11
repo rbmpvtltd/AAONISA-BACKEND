@@ -31,31 +31,98 @@ export class UserService {
     private readonly smsService: SmsService
   ) { }
 
-  async register(dto: RegisterDto, res: Response) {
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
-    const user = this.userRepository.create({
-      username: dto.username,
-      email: dto.email,
-      phone_no: dto.phone_no,
-      password: hashedPassword,
+  async preRegisterCheck(dto: { emailOrPhone: string; username: string }) {
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
+
+    const existingUser = await this.userRepository.findOne({
+      where: [
+        isEmail ? { email: dto.emailOrPhone } : { phone_no: dto.emailOrPhone },
+        { username: dto.username },
+      ],
     });
 
-    const savedUser = await this.userRepository.save(user);
-    const userProfile = this.userProfileRepository.create({ user_id: savedUser.id, role: dto.role, paid: false, star: 1 });
-    const savedProfile = await this.userProfileRepository.save(userProfile);
-    const tokens = this.authService.generateTokens({ sub: savedUser.id });
+    if (existingUser) {
+      throw new BadRequestException('Email, phone number or username already in use');
+    }
 
-    savedUser.refreshToken = await bcrypt.hash(tokens.refreshToken, 10);
-    await this.userRepository.save(savedUser);
+    const otp = await this.otpService.generateOtp({
+      email: isEmail ? dto.emailOrPhone : undefined,
+      phone_no: !isEmail ? dto.emailOrPhone : undefined,
+    });
 
-    res.cookie('accessToken', tokens.accessToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 15 * 60 * 1000 });
-    res.cookie('refreshToken', tokens.refreshToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000 });
+    if (isEmail) {
+      await this.emailService.sendOtp(dto.emailOrPhone, otp);
+    } else {
+      await this.smsService.sendOtpSms(dto.emailOrPhone, otp);
+    }
 
-    res.status(201).json({ message: 'User registered successfully' });
+    return { message: 'OTP sent for verification', success: true };
   }
 
+
+  async register(dto: RegisterDto, res: Response) {
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
+  const isValidOtp = await this.otpService.validateOtp({
+    email: isEmail ? dto.emailOrPhone : undefined,
+    phone_no: !isEmail ? dto.emailOrPhone : undefined,
+    code: dto.otp,
+  });
+
+  if (!isValidOtp) {
+    throw new BadRequestException('Invalid or expired OTP');
+  }
+  const existingUser = await this.userRepository.findOne({
+    where: [
+      isEmail ? { email: dto.emailOrPhone } : { phone_no: dto.emailOrPhone },
+      { username: dto.username },
+    ],
+  });
+
+  if (existingUser) {
+    throw new BadRequestException('Email, phone number or username already in use');
+  }
+
+  const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+  const user = this.userRepository.create({
+    username: dto.username,
+    email: isEmail ? dto.emailOrPhone : undefined,
+    phone_no: !isEmail ? dto.emailOrPhone : undefined,
+    password: hashedPassword,
+  });
+
+  const savedUser = await this.userRepository.save(user);
+
+  const userProfile = this.userProfileRepository.create({
+    user_id: savedUser.id,
+    role: dto.role,
+    paid: false,
+    star: 1,
+  });
+
+  await this.userProfileRepository.save(userProfile);
+
+  const tokens = this.authService.generateTokens({ sub: savedUser.id });
+  savedUser.refreshToken = await bcrypt.hash(tokens.refreshToken, 10);
+  await this.userRepository.save(savedUser);
+
+  res.cookie('accessToken', tokens.accessToken, {
+    httpOnly: true, secure: true, sameSite: 'strict', maxAge: 15 * 60 * 1000,
+  });
+  res.cookie('refreshToken', tokens.refreshToken, {
+    httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  return res.status(201).json({ message: 'User registered successfully', success: true });
+}
+
+
   async login(dto: LoginDto, res: Response) {
-    const user = await this.userRepository.findOne({ where: { email: dto.email } });
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
+
+    const user = await this.userRepository.findOne({
+      where: isEmail ? { email: dto.emailOrPhone } : { phone_no: dto.emailOrPhone },
+    });
 
     if (!user || !(await bcrypt.compare(dto.password, user.password))) {
       throw new UnauthorizedException('Invalid credentials');
@@ -65,17 +132,22 @@ export class UserService {
     user.refreshToken = await bcrypt.hash(tokens.refreshToken, 10);
     await this.userRepository.save(user);
 
-    res.cookie('accessToken', tokens.accessToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 15 * 60 * 1000 });
-    res.cookie('refreshToken', tokens.refreshToken, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('accessToken', tokens.accessToken, {
+      httpOnly: true, secure: true, sameSite: 'strict', maxAge: 15 * 60 * 1000,
+    });
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
-    return res.status(200).json({ message: 'Login successful', accessToken: tokens.accessToken });
+    return res.status(200).json({ message: 'Login successful', accessToken: tokens.accessToken, success: true });
   }
+
 
   async logout(userId: string, res: Response) {
     await this.userRepository.update(userId, { refreshToken: null });
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
-    return { message: 'Logged out successfully' };
+    return { message: 'Logged out successfully', success: true };
   }
 
   async refreshToken(userId: string, oldRefreshToken: string) {
@@ -90,39 +162,41 @@ export class UserService {
     return tokens;
   }
 
-  // async forgotPassword(dto: ForgotPasswordDto) {
-  //   const user = await this.userRepository.findOne({ where: { email: dto.email } });
-  //   if (!user) throw new NotFoundException('User not found');
-
-  //   const resetToken = crypto.randomBytes(32).toString('hex');
-  //   user.resetToken = await bcrypt.hash(resetToken, 10);
-  //   user.resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
-  //   await this.userRepository.save(user);
-  //   return { message: 'Reset link sent to your email', token: resetToken };
-  // }
-
   async forgotPassword(dto: ForgotPasswordDto) {
-    const user = await this.userRepository.findOne({ where: { email: dto.email } });
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
+
+    const user = await this.userRepository.findOne({
+      where: isEmail ? { email: dto.emailOrPhone } : { phone_no: dto.emailOrPhone },
+    });
+
     if (!user) throw new NotFoundException('User not found');
-    const otp = await this.otpService.generateOtp(user.id);
-    await this.emailService.sendOtp(user.email, otp);
-    if (user.phone_no) {
-      await this.smsService.sendOtpSms(user.phone_no, otp);
-    }
-    return 'OTP sent to your registered email/phone';
+
+    const otp = await this.otpService.generateOtp({
+      email: user.email,
+      phone_no: user.phone_no,
+    });
+
+    if (user.email) await this.emailService.sendOtp(user.email, otp);
+    if (user.phone_no) await this.smsService.sendOtpSms(user.phone_no, otp);
+
+    return { message: 'OTP sent for verification', success: true };
   }
 
-  async verifyOtp(dto: VerifyOtpDto) {
-    const user = await this.userRepository.findOne({ where: { email: dto.email } });
-    if (!user) throw new NotFoundException('User not found');
-    const isValid = await this.otpService.validateOtp(user.id, dto.code);
-    if (!isValid) throw new BadRequestException('Invalid OTP');
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    user.resetToken = await bcrypt.hash(resetToken, 10);
-    user.resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
-    await this.userRepository.save(user);
-    return { message: 'otp verified successfully', token: resetToken };
+
+  async verifyOtp(dto: { email?: string; phone_no?: string; code: string }) {
+    const isValid = await this.otpService.validateOtp({
+      email: dto.email,
+      phone_no: dto.phone_no,
+      code: dto.code,
+    });
+
+    if (!isValid) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    return { message: 'OTP verified successfully', success: true };
   }
+
   async resetPassword(dto: ResetPasswordDto) {
     const users = await this.userRepository.find();
 
@@ -145,7 +219,7 @@ export class UserService {
     user.resetTokenExpiry = null;
     await this.userRepository.save(user);
 
-    return { message: 'Password reset successfully' };
+    return { message: 'Password reset successfully', success: true };
   }
 
 
@@ -166,6 +240,7 @@ export class UserService {
     return {
       message: 'Profile updated successfully',
       user,
+      success: true,
     };
   }
 
@@ -216,7 +291,8 @@ export class UserService {
     await this.userRepository.save(user);
 
     return {
-      message: 'Profile updated successfully'
+      message: 'Profile updated successfully',
+      success: true,
     };
   }
 

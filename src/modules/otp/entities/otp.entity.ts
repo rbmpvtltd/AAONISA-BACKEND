@@ -5,8 +5,14 @@ export class Otp {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
-  userId: string;
+  @Column({ nullable: true })
+  userId?: string;
+
+  @Column({ nullable: true })
+  email?: string;
+
+  @Column({ nullable: true })
+  phone_no?: string;
 
   @Column({ type: 'varchar', length: 6 })
   code: string;
