@@ -1,11 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
-
+import { Entity, PrimaryGeneratedColumn, Column,Check } from 'typeorm';
 export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
 }
-
 @Entity('users')
+@Check(`"email" IS NOT NULL OR "phone_no" IS NOT NULL`)
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -13,8 +12,11 @@ export class User {
   @Column()
   username: string;
 
-  @Column({ unique: true })
+  @Column({ unique: true, nullable: true })
   email: string;
+
+  @Column({ unique: true, type: 'varchar', nullable: true })
+  phone_no: string;
 
   @Column()
   password: string;
@@ -35,3 +37,4 @@ export class User {
   @Column({ nullable: true, type: 'timestamptz' })
   resetTokenExpiry: Date | null;
 }
+

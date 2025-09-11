@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { AppDataSource } from '../data-source';
-// import { UserModule } from './modules/users/user.module';
+import { UserProfileModule } from './modules/users/user.module';
 // import { LikeModule } from './modules/likes/like.module';
 // import { ShareModule } from './modules/share/share.module';
 // import { PostsModule } from './modules/posts/posts.module';
@@ -21,7 +22,9 @@ import { AuthModule } from './modules/auth/auth.module';
         })
       },
     }),
+    ScheduleModule.forRoot(),
     AuthModule,
+    UserProfileModule,
     // LikeModule,
     // ShareModule,
     // PostsModule,

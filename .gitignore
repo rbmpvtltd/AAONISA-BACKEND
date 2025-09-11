@@ -6,8 +6,7 @@
 /build
 
 # production
-# /.env
-/.env.*.local
+.env
 
 # debug
 npm-debug.log*
@@ -24,10 +23,10 @@ Thumbs.db
 .idea/
 *.swp
 
+.treeignore
 # testing
 /coverage
 /.nyc_output
-
 # type checking
 *.tsbuildinfo
 

@@ -1,25 +1,81 @@
-import { IsBoolean, IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsString,
+  MinLength,
+  IsOptional,
+  IsEnum,
+  Validate,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  ValidationArguments,
+} from 'class-validator';
+import { UserRole } from '../entities/user.entity';
 
-export class CreateUserDto {
-    @IsNotEmpty()
-    @IsString()
-    @ApiProperty({ example: 'user' })
-    userName: string;
+@ValidatorConstraint({ name: 'IsEmailOrPhone', async: false })
+class IsEmailOrPhoneConstraint implements ValidatorConstraintInterface {
+  validate(value: any, args: ValidationArguments) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^[0-9]{10,15}$/;
+    return emailRegex.test(value) || phoneRegex.test(value);
+  }
 
-    @IsEmail()
-    @ApiProperty({ example: '0123456789' })
-    mobileNumber: string;
+  defaultMessage(args: ValidationArguments) {
+    return 'emailOrPhone must be a valid email or phone number';
+  }
+}
 
-    @ApiProperty({ example: 'password1234' })
-    password: string;
+export class PreRegisterDto {
+  @IsString()
+  @Validate(IsEmailOrPhoneConstraint)
+  emailOrPhone: string;
 
-    @IsBoolean()
-    paid: boolean;
+  @IsString()
+  username: string;
+}
 
-    @IsString()
-    role: string;
 
-    @IsString()
-    star: string;
+
+export class RegisterDto {
+  @IsString()
+  @Validate(IsEmailOrPhoneConstraint)
+  emailOrPhone: string;
+
+  @IsString()
+  @MinLength(6)
+  password: string;
+
+  @IsOptional()
+  @IsString()
+  username?: string;
+
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole = UserRole.USER;
+
+  @IsString()
+  otp: string;
+}
+
+export class LoginDto {
+  @IsString()
+  @Validate(IsEmailOrPhoneConstraint)
+  identifier: string;
+
+  @IsString()
+  password: string;
+
+  // resetTokenExpiry: Date; // Assuming this is for internal use; no validation needed?
+}
+export class ForgotPasswordDto {
+  @IsString()
+  @Validate(IsEmailOrPhoneConstraint)
+  emailOrPhone: string;
+}
+
+export class ResetPasswordDto {
+  @IsString()
+  token: string;
+
+  @IsString()
+  @MinLength(6)
+  newPassword: string;
 }

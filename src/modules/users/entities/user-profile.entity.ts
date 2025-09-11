@@ -1,28 +1,31 @@
-// import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+export enum StarLevel {
+  'none' = 0,
+  'bronze' = 1,
+  'silver' = 2,
+  'gold' = 3
+}
 
-// @Entity()
-// export class User {
-//   @PrimaryGeneratedColumn('uuid')
-//   id: string;
+@Entity()
+export class UserProfile {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-//   @Column({ unique: true })
-//   userName: string;
+  @Column({ unique: true })
+  user_id: string;
 
-//   @Column({ nullable: true }) // unique
-//   email: string;
+  @Column({default : '',nullable: true})
+  avatar : string;
 
-//   @Column({ unique: true }) 
-//   mobileNumber: string;
+  @Column({default : '',nullable: true})
+  bio : string;
 
-//   @Column()
-//   password: string;
+  @Column({ type: 'boolean', default: false })
+  paid: boolean;
 
-//   @Column({ type: 'boolean', default: false })
-//   paid: boolean;
+  @Column({ type: 'varchar', default: 'user' })
+  role: string;
 
-//   @Column({ type: 'varchar', default: 'user' })
-//   role: string;
-
-//   @Column({ default: 'none' })
-//   star: string;
-// }
+  @Column({type:'enum', enum:StarLevel, default: StarLevel.none })
+  star: StarLevel;
+}
