@@ -34,3 +34,12 @@ Thumbs.db
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+
+# Ignore all files inside uploads folders
+/src/uploads/**/*
+# But keep the folders
+!/src/uploads/
+/src/uploads/videos/**/*
+!/src/uploads/videos/
+/src/uploads/audios/**/*
+!/src/uploads/audios/
