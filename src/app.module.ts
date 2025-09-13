@@ -9,6 +9,7 @@ import { UserProfileModule } from './modules/users/user.module';
 // import { PostsModule } from './modules/posts/posts.module';
 // import { ReelsModule } from './modules/reels/reels.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { StreamModule } from './modules/stream/stream.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AuthModule } from './modules/auth/auth.module';
     ScheduleModule.forRoot(),
     AuthModule,
     UserProfileModule,
+    StreamModule,
     // LikeModule,
     // ShareModule,
     // PostsModule,
