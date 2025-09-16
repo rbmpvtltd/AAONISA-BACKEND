@@ -15,7 +15,7 @@ export class UserProfile {
   user_id: string;
 
   @Column({default : '',nullable: true})
-  avatar : string;
+  ProfilePicture : string;
 
   @Column({default : '',nullable: true})
   bio : string;

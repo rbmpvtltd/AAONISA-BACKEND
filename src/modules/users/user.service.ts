@@ -1,6 +1,7 @@
 // src/users/user.service.ts
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import {Multer} from 'multer'
 import { Repository } from 'typeorm';
 import { Response } from 'express';
 import * as bcrypt from 'bcrypt';
@@ -240,36 +241,43 @@ export class UserService {
   }
 
 
-  async updateProfile(dto: UpdateUserProfileDto) {
-    const payload = await this.authService.verifyToken(dto.token);
-    const userId = payload?.sub || payload?.id || payload.userId;
-    if (!userId) {
-      throw new UnauthorizedException('Invalid token');
-    }
-    const user = await this.userProfileRepository.findOne({ where: { user_id: userId } });
+  async updateProfile(dto: UpdateUserProfileDto, payload: any, file?: Multer.File) {
+  const userId = payload?.sub || payload?.id || payload?.userId;
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-    Object.assign(user, dto);
-    await this.userProfileRepository.save(user);
-
-    return {
-      message: 'Profile updated successfully',
-      user,
-      success: true,
-    };
+  if (!userId) {
+    throw new UnauthorizedException('Invalid token');
   }
 
-  async updateUser(dto: UpdateUserDto) {
-    const payload = await this.authService.verifyToken(dto.token);
+  const user = await this.userProfileRepository.findOne({ where: { user_id: userId } });
+
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+
+  // ✅ Save image path if file is uploaded
+  if (file) {
+    user.ProfilePicture = `uploads/profiles/${file.filename}`;
+  }
+
+  Object.assign(user, dto);
+  await this.userProfileRepository.save(user);
+
+  return {
+    message: 'Profile updated successfully',
+    user,
+    success: true,
+  };
+}
+
+  async updateUser(dto: UpdateUserDto,payload) {
+    // const payload = await this.authService.verifyToken(dto.token);
     const userId = payload?.sub || payload?.id || payload.userId;
     if (!userId) throw new UnauthorizedException('Invalid token');
 
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
-    const { email, phone_no, username } = dto;
-    if (!email && !phone_no && !username) {
+    const { email, phone_no} = dto;
+    if (!email && !phone_no) {
       throw new BadRequestException('No fields provided to update');
     }
 
@@ -288,12 +296,7 @@ export class UserService {
       }
     }
 
-    if (username) {
-      const existingUsername = await this.userRepository.findOne({ where: { username } });
-      if (existingUsername && existingUsername.id !== user.id) {
-        errors.username = 'Username already in use';
-      }
-    }
+    
     if (Object.keys(errors).length > 0) {
       return {
         message: 'Some fields are already taken',
@@ -303,7 +306,6 @@ export class UserService {
 
     if (email) user.email = email;
     if (phone_no) user.phone_no = phone_no;
-    if (username) user.username = username;
 
     await this.userRepository.save(user);
 

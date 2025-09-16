@@ -18,6 +18,9 @@ export class CreateVideoDto {
   @IsUUID()
   audioId: string;
 
+  @IsUUID()
+  filterId: string;
+
   @IsString()
   audio_trim_from: string;
 

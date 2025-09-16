@@ -30,6 +30,9 @@ export class Video {
     @ManyToOne(() => Audio, audio => audio.videos, { nullable: true })
     audio: Audio | null;
 
+    @Column({type: "uuid", nullable: true })
+    filterId: string | null;
+    
     @Column({
         type: 'enum',
         enum: VideoType,

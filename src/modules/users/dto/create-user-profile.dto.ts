@@ -6,7 +6,9 @@ export class CreateUserProfileDto {
     @IsString()
     @ApiProperty({ example: 'user' })
     userName: string;
-
+    @IsString()
+    additionalURL: string;
+    
     @IsEmail()
     @ApiProperty({ example: '0123456789' })
     mobileNumber: string;

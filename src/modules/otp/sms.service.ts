@@ -13,7 +13,7 @@ export class SmsService {
       const payload = {
         route: 'dlt',
         sender_id: 'RBMPLA',
-        template_id: '1707172620296899599',
+        template_id: '1207174228739240000',
         variables_values: otpCode,
         numbers: numbers,
         flash: '0',

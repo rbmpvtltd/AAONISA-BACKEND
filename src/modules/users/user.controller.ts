@@ -1,6 +1,10 @@
-import { Body, Controller, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, Req, Res, UseGuards,UseInterceptors,
+  UploadedFile, } from '@nestjs/common';
 import { UserService } from './user.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, PreRegisterDto } from './dto/create-user.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage,Multer } from 'multer';
+import { extname } from 'path';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
@@ -54,12 +58,37 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Post('update-profile')
-  updateProfile(@Req() req, @Body() dto: UpdateUserProfileDto) {
-    return this.userService.updateProfile(dto);
+  @UseInterceptors(FileInterceptor('ProfilePicture', {
+    storage: diskStorage({
+      destination: './uploads/profiles',
+      filename: (req, file, cb) => {
+        const userId = req.user.sub || req.user.id || req.user.userId;
+        const fileExtName = extname(file.originalname);
+        const fileName = `${userId}${fileExtName}`;
+        cb(null, fileName);
+      }
+    }),
+    fileFilter: (req, file, cb) => {
+      if (!file.mimetype.match(/\/(jpg|jpeg|png)$/)) {
+        cb(new Error('Only image files are allowed!'), false);
+      } else {
+        cb(null, true);
+      }
+    },
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  }))
+  async updateProfile(
+    @Req() req,
+    @Body() dto: UpdateUserProfileDto,
+    @UploadedFile() file: Multer.File
+  ) {
+    const payload = req.user;
+    return this.userService.updateProfile(dto, payload, file);
   }
   @UseGuards(JwtAuthGuard)
   @Post('update-user')
   updateUser(@Req() req, @Body() dto: UpdateUserDto) {
-    return this.userService.updateUser(dto);
+    const payload = req.user
+    return this.userService.updateUser(dto,payload);
   }
 }
