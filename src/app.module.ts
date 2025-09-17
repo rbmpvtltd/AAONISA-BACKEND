@@ -4,7 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { AppDataSource } from '../data-source';
 import { UserProfileModule } from './modules/users/user.module';
-// import { LikeModule } from './modules/likes/like.module';
+import { LikeModule } from './modules/likes/like.module';
 // import { ShareModule } from './modules/share/share.module';
 // import { PostsModule } from './modules/posts/posts.module';
 // import { ReelsModule } from './modules/reels/reels.module';
@@ -28,7 +28,7 @@ import { FollowModule } from './modules/follows/follow.module';
     UserProfileModule,
     StreamModule,
     FollowModule,
-    // LikeModule,
+    LikeModule,
     // ShareModule,
     // PostsModule,
     // ReelsModule
