@@ -10,7 +10,7 @@ import { UpdateUserDto } from './dto/update-user.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { Response } from 'express';
 import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
-
+import * as path from 'path';
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) { }
@@ -68,24 +68,27 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @Post('update-profile')
   @UseInterceptors(FileInterceptor('ProfilePicture', {
-    storage: diskStorage({
-      destination: './uploads/profiles',
-      filename: (req, file, cb) => {
-        const userId = req.user.sub || req.user.id || req.user.userId;
-        const fileExtName = extname(file.originalname);
-        const fileName = `${userId}${fileExtName}`;
-        cb(null, fileName);
-      }
-    }),
-    fileFilter: (req, file, cb) => {
-      if (!file.mimetype.match(/\/(jpg|jpeg|png)$/)) {
-        cb(new Error('Only image files are allowed!'), false);
-      } else {
-        cb(null, true);
-      }
+  storage: diskStorage({
+    destination: (req, file, cb) => {
+      const uploadPath = path.join('src', 'uploads', 'profiles');
+      cb(null, uploadPath);
     },
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
-  }))
+    filename: (req, file, cb) => {
+      const userId = req.user?.sub || req.user?.id || req.user?.userId;
+      const fileExtName = extname(file.originalname);
+      const fileName = `${userId}${fileExtName}`;
+      cb(null, fileName);
+    },
+  }),
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.match(/\/(jpg|jpeg|png)$/)) {
+      cb(new Error('Only image files are allowed!'), false);
+    } else {
+      cb(null, true);
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+}))
   async updateProfile(
     @Req() req,
     @Body() dto: UpdateUserProfileDto,

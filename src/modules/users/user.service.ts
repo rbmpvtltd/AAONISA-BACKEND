@@ -263,29 +263,45 @@ export class UserService {
     if (!userId) {
       throw new UnauthorizedException('Invalid token');
     }
+    console.log(payload)
 
-    const user = await this.userProfileRepository.findOne({ where: { user_id: userId } });
-
-    if (!user) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const userProfile = await this.userProfileRepository.findOne({ where: { user_id: userId } });
+    if (!user || !userProfile) {
       throw new NotFoundException('User not found');
     }
-
+    
     const isValid = await this.otpService.validateOtp({
       userId,
       code: dto.otp,
     });
-    
+
     if (!isValid) {
       throw new BadRequestException('Invalid or expired OTP');
     }
 
-    if (file) {
-      user.ProfilePicture = `uploads/profiles/${file.filename}`;
+    if (dto.username) {
+      const existingUser = await this.userRepository.findOne({
+        where: { username: dto.username },
+      });
+
+      if (existingUser && existingUser.id !== userId) {
+        throw new BadRequestException('Username already taken');
+      }
     }
 
-    Object.assign(user, dto);
-    await this.userProfileRepository.save(user);
+    if (file) {
+      userProfile.ProfilePicture = `../../uploads/profiles/${file.filename}`;
+    }
 
+    userProfile.name = dto.name || userProfile.name;
+    userProfile.bio = dto.bio || userProfile.bio; 
+    userProfile.url = dto.url || userProfile.url;
+    await this.userProfileRepository.save(userProfile);
+    if(dto.username){
+      user.username = dto.username;
+      await this.userRepository.save(user);
+    }
     return {
       message: 'Profile updated successfully',
       user,

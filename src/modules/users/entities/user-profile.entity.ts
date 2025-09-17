@@ -20,6 +20,11 @@ export class UserProfile {
   @Column({default : '',nullable: true})
   bio : string;
 
+  @Column({default : '',nullable: true})
+  name : string;
+  @Column({default : '',nullable: true})
+  url : string;
+
   @Column({ type: 'boolean', default: false })
   paid: boolean;
 

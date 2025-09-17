@@ -5,8 +5,8 @@ export class UpdateUserProfileDto{
     // @IsString()
     // token: string
 
-    @IsOptional()
-    profilePicture: string;
+    // @IsOptional()
+    // profilePicture: string;
 
     @IsOptional()
     bio: string;
@@ -22,4 +22,7 @@ export class UpdateUserProfileDto{
     @IsString()
     otp: string;
 
+    @IsOptional()
+    @IsString()
+    url?: string
 }
