@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AppDataSource } from '../data-source';
 import { UserProfileModule } from './modules/users/user.module';
 import { LikeModule } from './modules/likes/like.module';
+import { ViewModule } from './modules/views/view.module';
 // import { ShareModule } from './modules/share/share.module';
 // import { PostsModule } from './modules/posts/posts.module';
 // import { ReelsModule } from './modules/reels/reels.module';
@@ -29,6 +30,7 @@ import { FollowModule } from './modules/follows/follow.module';
     StreamModule,
     FollowModule,
     LikeModule,
+    ViewModule,
     // ShareModule,
     // PostsModule,
     // ReelsModule
