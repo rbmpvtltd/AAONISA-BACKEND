@@ -1,7 +1,7 @@
 // src/users/user.service.ts
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {Multer} from 'multer'
+import { Multer } from 'multer'
 import { Repository } from 'typeorm';
 import { Response } from 'express';
 import * as bcrypt from 'bcrypt';
@@ -62,60 +62,60 @@ export class UserService {
 
 
   async register(dto: RegisterDto, res: Response) {
-  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
-  const isValidOtp = await this.otpService.validateOtp({
-    email: isEmail ? dto.emailOrPhone : undefined,
-    phone_no: !isEmail ? dto.emailOrPhone : undefined,
-    code: dto.otp,
-  });
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
+    const isValidOtp = await this.otpService.validateOtp({
+      email: isEmail ? dto.emailOrPhone : undefined,
+      phone_no: !isEmail ? dto.emailOrPhone : undefined,
+      code: dto.otp,
+    });
 
-  if (!isValidOtp) {
-    throw new BadRequestException('Invalid or expired OTP');
+    if (!isValidOtp) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+    const existingUser = await this.userRepository.findOne({
+      where: [
+        isEmail ? { email: dto.emailOrPhone } : { phone_no: dto.emailOrPhone },
+        { username: dto.username },
+      ],
+    });
+
+    if (existingUser) {
+      throw new BadRequestException('Email, phone number or username already in use');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+    const user = this.userRepository.create({
+      username: dto.username,
+      email: isEmail ? dto.emailOrPhone : undefined,
+      phone_no: !isEmail ? dto.emailOrPhone : undefined,
+      password: hashedPassword,
+    });
+
+    const savedUser = await this.userRepository.save(user);
+
+    const userProfile = this.userProfileRepository.create({
+      user_id: savedUser.id,
+      role: dto.role,
+      paid: false,
+      star: 1,
+    });
+
+    await this.userProfileRepository.save(userProfile);
+
+    const tokens = this.authService.generateTokens({ sub: savedUser.id });
+    savedUser.refreshToken = await bcrypt.hash(tokens.refreshToken, 10);
+    await this.userRepository.save(savedUser);
+
+    res.cookie('accessToken', tokens.accessToken, {
+      httpOnly: true, secure: true, sameSite: 'strict', maxAge: 15 * 60 * 1000,
+    });
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(201).json({ message: 'User registered successfully', success: true });
   }
-  const existingUser = await this.userRepository.findOne({
-    where: [
-      isEmail ? { email: dto.emailOrPhone } : { phone_no: dto.emailOrPhone },
-      { username: dto.username },
-    ],
-  });
-
-  if (existingUser) {
-    throw new BadRequestException('Email, phone number or username already in use');
-  }
-
-  const hashedPassword = await bcrypt.hash(dto.password, 10);
-
-  const user = this.userRepository.create({
-    username: dto.username,
-    email: isEmail ? dto.emailOrPhone : undefined,
-    phone_no: !isEmail ? dto.emailOrPhone : undefined,
-    password: hashedPassword,
-  });
-
-  const savedUser = await this.userRepository.save(user);
-
-  const userProfile = this.userProfileRepository.create({
-    user_id: savedUser.id,
-    role: dto.role,
-    paid: false,
-    star: 1,
-  });
-
-  await this.userProfileRepository.save(userProfile);
-
-  const tokens = this.authService.generateTokens({ sub: savedUser.id });
-  savedUser.refreshToken = await bcrypt.hash(tokens.refreshToken, 10);
-  await this.userRepository.save(savedUser);
-
-  res.cookie('accessToken', tokens.accessToken, {
-    httpOnly: true, secure: true, sameSite: 'strict', maxAge: 15 * 60 * 1000,
-  });
-  res.cookie('refreshToken', tokens.refreshToken, {
-    httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
-
-  return res.status(201).json({ message: 'User registered successfully', success: true });
-}
 
 
   async login(dto: LoginDto, res: Response) {
@@ -186,33 +186,33 @@ export class UserService {
 
   async verifyOtp(dto: { emailOrPhone?: string; code: string }) {
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const phoneRegex = /^\d{10}$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^\d{10}$/;
 
-  let email: string | undefined;
-  let phone_no: string | undefined;
-  if (dto.emailOrPhone && emailRegex.test(dto.emailOrPhone)) {
-    email = dto.emailOrPhone;
-  } else if (dto.emailOrPhone && phoneRegex.test(dto.emailOrPhone)) {
-    phone_no = dto.emailOrPhone;
-  } else {
-    throw new BadRequestException('Invalid email or phone number format');
+    let email: string | undefined;
+    let phone_no: string | undefined;
+    if (dto.emailOrPhone && emailRegex.test(dto.emailOrPhone)) {
+      email = dto.emailOrPhone;
+    } else if (dto.emailOrPhone && phoneRegex.test(dto.emailOrPhone)) {
+      phone_no = dto.emailOrPhone;
+    } else {
+      throw new BadRequestException('Invalid email or phone number format');
+    }
+    console.log(email, phone_no);
+    const user = await this.userRepository.findOne({ where: { email: email, phone_no: phone_no } }); if (!user) throw new NotFoundException('User not found');
+
+    const isValid = await this.otpService.validateOtp({
+      email,
+      phone_no,
+      code: dto.code,
+    });
+    if (!isValid) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+    const resetToken = crypto.randomBytes(32).toString('hex'); user.resetToken = await bcrypt.hash(resetToken, 10); user.resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
+    await this.userRepository.save(user);
+    return { message: 'OTP verified successfully', token: resetToken, success: true };
   }
-  console.log(email, phone_no);
-  const user = await this.userRepository.findOne({ where: { email: email, phone_no: phone_no } }); if (!user) throw new NotFoundException('User not found');
-  
-  const isValid = await this.otpService.validateOtp({
-    email,
-    phone_no,
-    code: dto.code,
-  });
-  if (!isValid) {
-    throw new BadRequestException('Invalid or expired OTP');
-  }
-  const resetToken = crypto.randomBytes(32).toString('hex'); user.resetToken = await bcrypt.hash(resetToken, 10); user.resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
-  await this.userRepository.save(user);
-  return { message: 'OTP verified successfully',token:resetToken, success: true };
-}
 
 
   async resetPassword(dto: ResetPasswordDto) {
@@ -240,43 +240,67 @@ export class UserService {
     return { message: 'Password reset successfully', success: true };
   }
 
+  async updateProfileOtp(userId: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    const phone_no = user.phone_no;
+    const email = user.email;
+    const otp = await this.otpService.generateOtp({
+      userId
+    })
+
+    if (email) await this.emailService.sendOtp(email, otp);
+    if (phone_no) await this.smsService.sendOtpSms(phone_no, otp);
+    return { message: 'OTP sent for verification', success: true };
+  }
 
   async updateProfile(dto: UpdateUserProfileDto, payload: any, file?: Multer.File) {
-  const userId = payload?.sub || payload?.id || payload?.userId;
+    const userId = payload?.sub || payload?.id || payload?.userId;
 
-  if (!userId) {
-    throw new UnauthorizedException('Invalid token');
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    const user = await this.userProfileRepository.findOne({ where: { user_id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const isValid = await this.otpService.validateOtp({
+      userId,
+      code: dto.otp,
+    });
+    
+    if (!isValid) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    if (file) {
+      user.ProfilePicture = `uploads/profiles/${file.filename}`;
+    }
+
+    Object.assign(user, dto);
+    await this.userProfileRepository.save(user);
+
+    return {
+      message: 'Profile updated successfully',
+      user,
+      success: true,
+    };
   }
 
-  const user = await this.userProfileRepository.findOne({ where: { user_id: userId } });
-
-  if (!user) {
-    throw new NotFoundException('User not found');
-  }
-
-  // ✅ Save image path if file is uploaded
-  if (file) {
-    user.ProfilePicture = `uploads/profiles/${file.filename}`;
-  }
-
-  Object.assign(user, dto);
-  await this.userProfileRepository.save(user);
-
-  return {
-    message: 'Profile updated successfully',
-    user,
-    success: true,
-  };
-}
-
-  async updateUser(dto: UpdateUserDto,payload) {
+  async updateUser(dto: UpdateUserDto, payload) {
     // const payload = await this.authService.verifyToken(dto.token);
     const userId = payload?.sub || payload?.id || payload.userId;
     if (!userId) throw new UnauthorizedException('Invalid token');
 
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
-    const { email, phone_no} = dto;
+    const { email, phone_no } = dto;
     if (!email && !phone_no) {
       throw new BadRequestException('No fields provided to update');
     }
@@ -296,7 +320,7 @@ export class UserService {
       }
     }
 
-    
+
     if (Object.keys(errors).length > 0) {
       return {
         message: 'Some fields are already taken',

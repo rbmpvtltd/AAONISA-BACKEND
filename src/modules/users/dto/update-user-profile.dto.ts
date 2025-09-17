@@ -19,4 +19,7 @@ export class UpdateUserProfileDto{
     @IsString()
     username?: string;
 
+    @IsString()
+    otp: string;
+
 }

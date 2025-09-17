@@ -51,9 +51,18 @@ export class UserController {
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.userService.resetPassword(dto);
   }
+
   @Post('verify-otp')
   verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.userService.verifyOtp(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('update-profile-send-otp')
+  updateProfileOtp(@Req() req) {
+    const payload = req.user;
+    const userId = payload?.sub || payload?.id || payload?.userId;
+    return this.userService.updateProfileOtp(userId.toString());
   }
 
   @UseGuards(JwtAuthGuard)

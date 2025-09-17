@@ -12,7 +12,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { StreamModule } from './modules/stream/stream.module';
 
 @Module({
-  imports: [
+  imports: [ 
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRootAsync({
       useFactory: () => {
