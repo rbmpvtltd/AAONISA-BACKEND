@@ -10,7 +10,7 @@ import { UserProfileModule } from './modules/users/user.module';
 // import { ReelsModule } from './modules/reels/reels.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { StreamModule } from './modules/stream/stream.module';
-
+import { FollowModule } from './modules/follows/follow.module';
 @Module({
   imports: [ 
     ConfigModule.forRoot({ isGlobal: true }),
@@ -27,6 +27,7 @@ import { StreamModule } from './modules/stream/stream.module';
     AuthModule,
     UserProfileModule,
     StreamModule,
+    FollowModule,
     // LikeModule,
     // ShareModule,
     // PostsModule,

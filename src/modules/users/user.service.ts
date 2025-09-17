@@ -304,7 +304,6 @@ export class UserService {
     }
     return {
       message: 'Profile updated successfully',
-      user,
       success: true,
     };
   }
