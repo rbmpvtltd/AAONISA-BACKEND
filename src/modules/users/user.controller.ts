@@ -6,7 +6,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage,Multer } from 'multer';
 import { extname } from 'path';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto'
-import { UpdateUserEmail, UpdateUserPhone } from './dto/update-user.dto'
+import { UpdateEmailOtp, UpdatePhoneOtp, UpdateUserEmail, UpdateUserPhone } from './dto/update-user.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { Response } from 'express';
 import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
@@ -67,18 +67,18 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Post('update-email-send-otp')
-  updateEmailOtp(@Req() req) {
+  updateEmailOtp(@Req() req ,dto:UpdateEmailOtp) {
     const payload = req.user;
     const userId = payload?.sub || payload?.id || payload?.userId;
-    return this.userService.updateEmailOtp(userId.toString());
+    return this.userService.updateEmailOtp(dto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('update-phone-send-otp')
-  updatePhoneOtp(@Req() req) {
+  updatePhoneOtp(@Req() req, dto:UpdatePhoneOtp) {
     const payload = req.user;
     const userId = payload?.sub || payload?.id || payload?.userId;
-    return this.userService.updatePhoneOtp(userId.toString());
+    return this.userService.updatePhoneOtp(dto);
   }
 
   @UseGuards(JwtAuthGuard)

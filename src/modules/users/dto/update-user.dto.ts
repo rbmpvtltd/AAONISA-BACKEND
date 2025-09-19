@@ -1,5 +1,16 @@
 import { IsEmail, IsString } from 'class-validator';
 
+
+export class UpdateEmailOtp {
+    @IsEmail()
+    email: string;
+
+}
+
+export class UpdatePhoneOtp {
+    @IsString()
+    phone: string;
+}
 export class UpdateUserEmail {
     @IsEmail()
     email: string;
