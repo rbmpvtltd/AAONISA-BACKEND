@@ -95,11 +95,12 @@ export class VideoService {
     }
 
 
-    async findAll(): Promise<Video[]> {
-        return await this.videoRepository.find({
-            relations: ['audio'],
+    async findAll(): Promise<String[]> {
+        const videos = await this.videoRepository.find({
+            select: ['uuid'],
             order: { created_at: 'DESC' },
         });
+        return videos.map(v => v.uuid);
     }
 
     async streamVideo(id: string, req: Request, res: Response) {

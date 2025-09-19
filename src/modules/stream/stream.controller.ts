@@ -37,7 +37,7 @@ export class VideoController {
     return this.videoService.create(createVideoDto, file.filename, user.userId);
   }
 
-  @Get(':id')
+  @Get('/stream/:id')
   @UseGuards(JwtAuthGuard)
   async streamVideo(
     @Param('id') id: string,
@@ -47,5 +47,10 @@ export class VideoController {
     return this.videoService.streamVideo(id, req, res);
   }
   
-
+  @Get('/getAllStreamIds')
+  @UseGuards(JwtAuthGuard)
+  async findAll(
+  ) {
+    return this.videoService.findAll();
+  }
 }
