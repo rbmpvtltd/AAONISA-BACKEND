@@ -9,7 +9,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { User } from '../users/entities/user.entity';
-
+import { Request,Response } from 'express';
 @Injectable()
 export class VideoService {
     constructor(
@@ -101,6 +101,54 @@ export class VideoService {
             order: { created_at: 'DESC' },
         });
     }
+
+    async streamVideo(id: string, req: Request, res: Response) {
+    const video = await this.videoRepository.findOne({ where: { uuid: id } });
+    if (!video) {
+      throw new NotFoundException('Video not found');
+    }
+
+    const filePath = path.join(process.cwd(),'src', video.videoUrl); 
+    console.log(filePath)
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('File not found on server');
+    }
+
+    const stat = fs.statSync(filePath);
+    const fileSize = stat.size;
+    const range = req.headers.range;
+
+    if (range) {
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+      if (start >= fileSize) {
+        res.status(416).send(
+          `Requested range not satisfiable\n${start} >= ${fileSize}`,
+        );
+        return;
+      }
+
+      const chunkSize = end - start + 1;
+      const file = fs.createReadStream(filePath, { start, end });
+
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunkSize,
+        'Content-Type': 'video/mp4',
+      });
+
+      file.pipe(res);
+    } else {
+      res.writeHead(200, {
+        'Content-Length': fileSize,
+        'Content-Type': 'video/mp4',
+      });
+      fs.createReadStream(filePath).pipe(res);
+    }
+  }
 
     async findOne(id: string): Promise<Video> {
         const video = await this.videoRepository.findOne({
