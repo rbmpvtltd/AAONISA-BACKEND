@@ -307,13 +307,13 @@ export class UserService {
     };
   }
 
-  async updateEmailOtp(userId: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+  async updateEmailOtp(dto) {
+    const user = await this.userRepository.findOne({ where: { email: dto.email } });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
+    if (user) {
+      throw new NotFoundException('Email is Taken');
     }
-    const email = user.email;
+    const email = dto.email;
     const otp = await this.otpService.generateOtp({
       email
     })
@@ -322,13 +322,13 @@ export class UserService {
     return { message: 'OTP sent for verification', success: true };
   }
 
-  async updatePhoneOtp(userId: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+  async updatePhoneOtp(dto) {
+    const user = await this.userRepository.findOne({ where: { phone_no: dto.phone } });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
+    if (user) {
+      throw new NotFoundException('Phone No Is Taken');
     }
-    const phone = user.phone_no;
+    const phone = dto.phone;
     const otp = await this.otpService.generateOtp({
       phone_no: phone
     })
