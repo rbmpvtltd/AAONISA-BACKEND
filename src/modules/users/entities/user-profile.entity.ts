@@ -15,10 +15,15 @@ export class UserProfile {
   user_id: string;
 
   @Column({default : '',nullable: true})
-  avatar : string;
+  ProfilePicture : string;
 
   @Column({default : '',nullable: true})
   bio : string;
+
+  @Column({default : '',nullable: true})
+  name : string;
+  @Column({default : '',nullable: true})
+  url : string;
 
   @Column({ type: 'boolean', default: false })
   paid: boolean;

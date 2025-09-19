@@ -4,14 +4,16 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { AppDataSource } from '../data-source';
 import { UserProfileModule } from './modules/users/user.module';
-// import { LikeModule } from './modules/likes/like.module';
+import { LikeModule } from './modules/likes/like.module';
+import { ViewModule } from './modules/views/view.module';
 // import { ShareModule } from './modules/share/share.module';
 // import { PostsModule } from './modules/posts/posts.module';
 // import { ReelsModule } from './modules/reels/reels.module';
 import { AuthModule } from './modules/auth/auth.module';
-
+import { StreamModule } from './modules/stream/stream.module';
+import { FollowModule } from './modules/follows/follow.module';
 @Module({
-  imports: [
+  imports: [ 
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRootAsync({
       useFactory: () => {
@@ -25,7 +27,10 @@ import { AuthModule } from './modules/auth/auth.module';
     ScheduleModule.forRoot(),
     AuthModule,
     UserProfileModule,
-    // LikeModule,
+    StreamModule,
+    FollowModule,
+    LikeModule,
+    ViewModule,
     // ShareModule,
     // PostsModule,
     // ReelsModule

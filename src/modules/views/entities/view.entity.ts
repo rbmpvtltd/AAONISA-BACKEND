@@ -1,3 +1,5 @@
+// src/view/entities/view.entity.ts
+
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -8,18 +10,19 @@ import {
   Unique,
 } from 'typeorm';
 
-@Unique(['follower', 'following'])
-@Entity('follows')
-export class Follow {
+@Unique(['user_id', 'reel_id'])
+@Entity('views')
+export class View {
   @PrimaryGeneratedColumn('uuid')
-  follow_id: string;
+  view_id: string;
 
   @Column('uuid')
-  follower: string;
+  user_id: string;
 
   @Column('uuid')
-  following: string;
+  reel_id: string;
 
+ 
   @CreateDateColumn()
   createdAt: Date;
 }

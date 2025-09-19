@@ -1,37 +1,31 @@
-// import { BadRequestException, Injectable } from '@nestjs/common';
-// import { CreateLikeDto } from './dto/create-like.dto';
-// import { UpdateLikeDto } from './dto/update-like.dto';
-// import { InjectRepository } from '@nestjs/typeorm';
-// import { Like,  } from './entities/like.entity';
-// import { Repository } from 'typeorm';
+// src/like/like.service.ts
 
-// @Injectable()
-// export class LikesService {
-//   constructor(
-//     @InjectRepository(Like)
-//     private likeRepository: Repository<Like>,
-//   ) {}
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Like } from './entities/like.entity';
+import { Repository } from 'typeorm';
 
-//   async likePost(createLikeDto: CreateLikeDto): Promise<Like> {
-//     const { user_id, post_id } = createLikeDto;
+@Injectable()
+export class LikeService {
+    constructor(
+        @InjectRepository(Like)
+        private readonly likeRepository: Repository<Like>,
 
-//     const existingLike = await this.likeRepository.findOne({
-//       where: { user_id, post_id },
-//     });
 
-//     if (existingLike) {
-//       throw new BadRequestException('Already liked this post');
-//     }
+    ) { }
 
-//     const like = this.likeRepository.create(createLikeDto);
-//     return await this.likeRepository.save(like);
-//   }
+    async toggleLike(userId: string, reelId: string) {
+        const existingLike = await this.likeRepository.findOne({
+            where: { user_id: userId, reel_id: reelId },
+        });
 
-//   async unlikePost(user_id: number, post_id: number): Promise<void> {
-//     await this.likeRepository.delete({ user_id, post_id });
-//   }
-
-//   async countLikes(post_id: number): Promise<number> {
-//     return this.likeRepository.count({ where: { post_id } });
-//   }
-// }
+        if (existingLike) {
+            await this.likeRepository.remove(existingLike);
+            return { message: 'Reel unliked', liked: false };
+        } else {
+            const newLike = this.likeRepository.create({ user_id: userId, reel_id: reelId });
+            await this.likeRepository.save(newLike);
+            return { message: 'Reel liked', liked: true };
+        }
+    }
+}

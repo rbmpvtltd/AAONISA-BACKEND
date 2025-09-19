@@ -1,16 +1,27 @@
-// import { User } from "src/modules/users/entities/user-profile.entity";
-// import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
-// import { UUID } from "typeorm/driver/mongodb/bson.typings";
+// src/like/entities/like.entity.ts
 
-// @Entity()
-// export class Like {
-// @PrimaryGeneratedColumn()
-// id: number;
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Unique,
+} from 'typeorm';
 
-// @Column( {unique:true} ) 
-// user_id : number
+@Unique(['user_id', 'reel_id'])
+@Entity('likes')
+export class Like {
+  @PrimaryGeneratedColumn('uuid')
+  like_id: string;
 
-// @Column( {unique:true} ) 
-// post_id : number
+  @Column('uuid')
+  reel_id: string;
 
-// }
+  @Column('uuid')
+  user_id: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
+}
