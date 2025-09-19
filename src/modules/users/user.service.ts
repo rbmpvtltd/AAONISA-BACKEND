@@ -11,7 +11,7 @@ import { UserProfile } from './entities/user-profile.entity';
 import { User } from './entities/user.entity';
 import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/create-user.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto'
-import { UpdateUserDto } from './dto/update-user.dto'
+import { UpdateUserEmail, UpdateUserPhone } from './dto/update-user.dto'
 import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
 import { AuthService } from '../auth/auth.service';
 import { OtpService } from '../otp/otp.service';
@@ -269,7 +269,7 @@ export class UserService {
     if (!user || !userProfile) {
       throw new NotFoundException('User not found');
     }
-    
+
     const isValid = await this.otpService.validateOtp({
       userId,
       code: dto.otp,
@@ -294,10 +294,10 @@ export class UserService {
     }
 
     userProfile.name = dto.name || userProfile.name;
-    userProfile.bio = dto.bio || userProfile.bio; 
+    userProfile.bio = dto.bio || userProfile.bio;
     userProfile.url = dto.url || userProfile.url;
     await this.userProfileRepository.save(userProfile);
-    if(dto.username){
+    if (dto.username) {
       user.username = dto.username;
       await this.userRepository.save(user);
     }
@@ -307,16 +307,45 @@ export class UserService {
     };
   }
 
-  async updateUser(dto: UpdateUserDto, payload) {
-    // const payload = await this.authService.verifyToken(dto.token);
+  async updateEmailOtp(userId: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    const email = user.email;
+    const otp = await this.otpService.generateOtp({
+      email
+    })
+
+    if (email) await this.emailService.sendOtp(email, otp);
+    return { message: 'OTP sent for verification', success: true };
+  }
+
+  async updatePhoneOtp(userId: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    const phone = user.phone_no;
+    const otp = await this.otpService.generateOtp({
+      phone_no: phone
+    })
+
+    if (phone) await this.smsService.sendOtpSms(phone, otp);
+    return { message: 'OTP sent for verification', success: true };
+  }
+
+  async updateUserEmail(dto: UpdateUserEmail, payload) {
     const userId = payload?.sub || payload?.id || payload.userId;
     if (!userId) throw new UnauthorizedException('Invalid token');
 
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
-    const { email, phone_no } = dto;
-    if (!email && !phone_no) {
-      throw new BadRequestException('No fields provided to update');
+    const { email } = dto;
+    if (!email) {
+      throw new BadRequestException('No Email provided to update');
     }
 
     const errors: Record<string, string> = {};
@@ -327,28 +356,59 @@ export class UserService {
       }
     }
 
-    if (phone_no) {
-      const existingPhone = await this.userRepository.findOne({ where: { phone_no } });
-      if (existingPhone && existingPhone.id !== user.id) {
-        errors.phone_no = 'Phone number already in use';
-      }
-    }
+    const isValid = await this.otpService.validateOtp({
+      email: email,
+      code: dto.otp,
+    });
 
-
-    if (Object.keys(errors).length > 0) {
-      return {
-        message: 'Some fields are already taken',
-        errors,
-      };
+    if (!isValid) {
+      throw new BadRequestException('Invalid or expired OTP');
     }
 
     if (email) user.email = email;
-    if (phone_no) user.phone_no = phone_no;
 
     await this.userRepository.save(user);
 
     return {
-      message: 'Profile updated successfully',
+      message: 'Email updated successfully',
+      success: true,
+    };
+  }
+
+  async updateUserPhone(dto: UpdateUserPhone, payload) {
+    const userId = payload?.sub || payload?.id || payload.userId;
+    if (!userId) throw new UnauthorizedException('Invalid token');
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    const { phone } = dto;
+    if (!phone) {
+      throw new BadRequestException('No Phone Number provided to update');
+    }
+
+    const errors: Record<string, string> = {};
+    if (phone) {
+      const existingPhone = await this.userRepository.findOne({ where: { phone_no: phone } });
+      if (existingPhone && existingPhone.id !== user.id) {
+        errors.Phone = 'phone already in use';
+      }
+    }
+
+    const isValid = await this.otpService.validateOtp({
+      phone_no: phone,
+      code: dto.otp,
+    });
+
+    if (!isValid) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    if (phone) user.phone_no = phone;
+
+    await this.userRepository.save(user);
+
+    return {
+      message: 'Phone updated successfully',
       success: true,
     };
   }

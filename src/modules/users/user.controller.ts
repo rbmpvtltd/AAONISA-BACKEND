@@ -6,7 +6,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage,Multer } from 'multer';
 import { extname } from 'path';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto'
-import { UpdateUserDto } from './dto/update-user.dto'
+import { UpdateUserEmail, UpdateUserPhone } from './dto/update-user.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { Response } from 'express';
 import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
@@ -66,6 +66,22 @@ export class UserController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('update-email-send-otp')
+  updateEmailOtp(@Req() req) {
+    const payload = req.user;
+    const userId = payload?.sub || payload?.id || payload?.userId;
+    return this.userService.updateEmailOtp(userId.toString());
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('update-phone-send-otp')
+  updatePhoneOtp(@Req() req) {
+    const payload = req.user;
+    const userId = payload?.sub || payload?.id || payload?.userId;
+    return this.userService.updatePhoneOtp(userId.toString());
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('update-profile')
   @UseInterceptors(FileInterceptor('ProfilePicture', {
   storage: diskStorage({
@@ -97,10 +113,18 @@ export class UserController {
     const payload = req.user;
     return this.userService.updateProfile(dto, payload, file);
   }
+
   @UseGuards(JwtAuthGuard)
-  @Post('update-user')
-  updateUser(@Req() req, @Body() dto: UpdateUserDto) {
+  @Post('update-user-email')
+  updateUserEmail(@Req() req, @Body() dto: UpdateUserEmail) {
     const payload = req.user
-    return this.userService.updateUser(dto,payload);
+    return this.userService.updateUserEmail(dto,payload);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('update-user-phone')
+  updateUserPhone(@Req() req, @Body() dto: UpdateUserPhone) {
+    const payload = req.user
+    return this.userService.updateUserPhone(dto,payload);
   }
 }

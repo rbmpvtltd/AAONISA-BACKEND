@@ -43,3 +43,5 @@ Thumbs.db
 !/src/uploads/videos/
 /src/uploads/audios/**/*
 !/src/uploads/audios/
+/src/uploads/profiles/**/*
+!/src/uploads/profiles/
