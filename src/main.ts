@@ -13,7 +13,7 @@ async function bootstrap() {
     credentials: true,
   })
   
-  app.use('/uploads', express.static(join(process.cwd(), 'src', 'uploads','videos')))
+  app.use('/uploads', express.static(join(process.cwd(), 'src', 'uploads')))
 
   app.use(cookieParser());
   app.setGlobalPrefix('api');
