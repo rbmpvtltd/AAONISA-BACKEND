@@ -357,7 +357,7 @@ export class UserService {
     }
 
     const isValid = await this.otpService.validateOtp({
-      email: user.email,
+      email: email,
       code: dto.otp,
     });
 
@@ -395,7 +395,7 @@ export class UserService {
     }
 
     const isValid = await this.otpService.validateOtp({
-      phone_no: user.phone_no,
+      phone_no: phone,
       code: dto.otp,
     });
 

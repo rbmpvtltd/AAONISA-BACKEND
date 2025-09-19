@@ -67,7 +67,7 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Post('update-email-send-otp')
-  updateEmailOtp(@Req() req ,dto:UpdateEmailOtp) {
+  updateEmailOtp(@Req() req ,@Body() dto:UpdateEmailOtp) {
     const payload = req.user;
     const userId = payload?.sub || payload?.id || payload?.userId;
     return this.userService.updateEmailOtp(dto);
@@ -75,7 +75,7 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Post('update-phone-send-otp')
-  updatePhoneOtp(@Req() req, dto:UpdatePhoneOtp) {
+  updatePhoneOtp(@Req() req,@Body() dto:UpdatePhoneOtp) {
     const payload = req.user;
     const userId = payload?.sub || payload?.id || payload?.userId;
     return this.userService.updatePhoneOtp(dto);
