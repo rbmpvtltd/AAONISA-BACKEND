@@ -263,7 +263,6 @@ export class UserService {
     if (!userId) {
       throw new UnauthorizedException('Invalid token');
     }
-    console.log(payload)
 
     const user = await this.userRepository.findOne({ where: { id: userId } });
     const userProfile = await this.userProfileRepository.findOne({ where: { user_id: userId } });
