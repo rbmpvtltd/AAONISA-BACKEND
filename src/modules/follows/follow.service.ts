@@ -5,7 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Follow } from './entities/follow.entity';
 import { User } from '../users/entities/user.entity';
-
+import { AppGateway } from 'src/app.gateway';
 @Injectable()
 export class FollowService {
   constructor(
@@ -14,7 +14,8 @@ export class FollowService {
 
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-  ) {}
+    private readonly gateway: AppGateway
+  ) { }
 
   async followUser(followerId: string, followingId: string) {
     if (followerId === followingId) {
@@ -23,6 +24,10 @@ export class FollowService {
 
     const userToFollow = await this.userRepository.findOne({
       where: { id: followingId },
+    });
+
+    const userWhoFollow = await this.userRepository.findOne({
+      where: { id: followerId },
     });
 
     if (!userToFollow) {
@@ -43,6 +48,7 @@ export class FollowService {
     });
 
     await this.followRepository.save(follow);
+    this.gateway.emitToUser(followingId, 'followState',`${followerId}` );
 
     return { message: 'Followed successfully', follow };
   }
@@ -59,5 +65,24 @@ export class FollowService {
     await this.followRepository.remove(follow);
 
     return { message: 'Unfollowed successfully' };
+  }
+
+  async getFollowState(userId) {
+    this.gateway.broadcast('message','hello')
+    const user = await this.userRepository.find(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const followers = await this.followRepository.find({
+      where: { following: userId },
+      select: ["follower"],
+    });
+
+    const followings = await this.followRepository.find({ where: { follower: userId }, select: ["following"] });
+    return {
+      followers: followers.map(f => f.follower),
+      followings: followings.map(f => f.following)
+    };
   }
 }

@@ -18,7 +18,6 @@ import { OtpService } from '../otp/otp.service';
 import { EmailService } from '../otp/email.service';
 import { SmsService } from '../otp/sms.service';
 
-
 @Injectable()
 export class UserService {
   constructor(
@@ -413,4 +412,7 @@ export class UserService {
     };
   }
 
+  async getFollowState(){
+
+  }
 } 

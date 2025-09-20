@@ -10,6 +10,8 @@ import { ShareModule } from './modules/share/share.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { StreamModule } from './modules/stream/stream.module';
 import { FollowModule } from './modules/follows/follow.module';
+import { AppGateway } from './app.gateway';
+import { ApiOAuth2 } from '@nestjs/swagger';
 @Module({
   imports: [ 
     ConfigModule.forRoot({ isGlobal: true }),
@@ -32,6 +34,6 @@ import { FollowModule } from './modules/follows/follow.module';
     ShareModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [AppGateway],
 })
 export class AppModule { }

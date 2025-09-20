@@ -11,7 +11,6 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { FollowService } from './follow.service';
 import { CreateFollowDto } from './dto/follow.dto';
-
 @Controller('follow')
 export class FollowController {
   constructor(private readonly followService: FollowService) {}
@@ -34,5 +33,13 @@ export class FollowController {
   ) {
     const followerId = req.user.userId;
     return this.followService.unfollowUser(followerId, dto.following);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('get-follow-state')
+  getFollowState(@Req() req) {
+    const payload = req.user;
+    const userId = payload?.sub || payload?.id || payload?.userId;
+    return this.followService.getFollowState(userId);
   }
 }
