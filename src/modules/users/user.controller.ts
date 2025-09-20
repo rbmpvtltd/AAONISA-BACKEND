@@ -127,12 +127,4 @@ export class UserController {
     const payload = req.user
     return this.userService.updateUserPhone(dto,payload);
   }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('get-follow-state')
-  getFollowState(@Req() req) {
-    const payload = req.user;
-    const userId = payload?.sub || payload?.id || payload?.userId;
-    return this.userService.getFollowState();
-  }
 }

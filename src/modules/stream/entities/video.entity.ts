@@ -10,6 +10,7 @@ import { User } from '../../users/entities/user.entity';
 import { Audio } from './audio.entity';
 import { Like } from '../../likes/entities/like.entity';
 import { View } from '../../views/entities/view.entity';
+import { IsOptional } from 'class-validator';
 
 export enum VideoType {
   NEWS = 'news',

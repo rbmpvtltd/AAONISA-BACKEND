@@ -83,10 +83,13 @@ export class VideoService {
                 await this.audioRepository.save(audio);
             }
         }
-
+        const userInfo = await this.userRepository.findOne({ where: { id: userId } });
+        if (!userInfo) {
+            throw new NotFoundException('User not found');
+        }
         const video = this.videoRepository.create({
             ...createVideoDto,
-            user_id: userId,
+            user_id: userInfo,
             audio: audio || null,
             videoUrl: `/uploads/videos/${filename}`,
         });
