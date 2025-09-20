@@ -68,7 +68,6 @@ export class FollowService {
   }
 
   async getFollowState(userId) {
-    this.gateway.broadcast('message','hello')
     const user = await this.userRepository.find(userId);
     if (!user) {
       throw new Error("User not found");

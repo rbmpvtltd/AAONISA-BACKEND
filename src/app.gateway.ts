@@ -59,11 +59,11 @@ import { Server, Socket } from 'socket.io';
   cors: { origin: '*' },
   namespace: '/socket.io',
 })
+
 export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  // Map userId -> socketId
   private users: Map<string, string> = new Map();
 
   handleConnection(client: Socket) {
