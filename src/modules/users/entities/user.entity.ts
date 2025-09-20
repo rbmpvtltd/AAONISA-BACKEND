@@ -1,8 +1,20 @@
-import { Entity, PrimaryGeneratedColumn, Column,Check } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  Check,
+} from 'typeorm';
+import { Follow } from '../../follows/entities/follow.entity';
+import { Like } from '../../likes/entities/like.entity';
+import { View } from '../../views/entities/view.entity';
+import { Video } from '../../stream/entities/video.entity';
+
 export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
 }
+
 @Entity('users')
 @Check(`"email" IS NOT NULL OR "phone_no" IS NOT NULL`)
 export class User {
@@ -36,5 +48,20 @@ export class User {
 
   @Column({ nullable: true, type: 'timestamptz' })
   resetTokenExpiry: Date | null;
-}
 
+  // ----------------- RELATIONS -----------------
+  @OneToMany(() => Follow, (follow) => follow.follower, { cascade: true })
+  following: Follow[];
+
+  @OneToMany(() => Follow, (follow) => follow.following, { cascade: true })
+  followers: Follow[];
+
+  @OneToMany(() => Like, (like) => like.user, { cascade: true })
+  likes: Like[];
+
+  @OneToMany(() => View, (view) => view.user, { cascade: true })
+  views: View[];
+
+  @OneToMany(() => Video, (video) => video.user_id, { cascade: true })
+  videos: Video[];
+}

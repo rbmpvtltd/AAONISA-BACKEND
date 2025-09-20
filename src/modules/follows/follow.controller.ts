@@ -21,7 +21,7 @@ export class FollowController {
     @Body() dto: CreateFollowDto,
     @Req() req: any,
   ) {
-    const followerId = req.user.userId;
+    const followerId: string = req.user.userId;
     return this.followService.followUser(followerId, dto.following);
   }
 

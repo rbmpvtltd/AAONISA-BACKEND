@@ -1,12 +1,11 @@
 import {
   Entity,
   PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
   ManyToOne,
-  JoinColumn,
+  CreateDateColumn,
   Unique,
 } from 'typeorm';
+import { User } from '../../users/entities/user.entity';
 
 @Unique(['follower', 'following'])
 @Entity('follows')
@@ -14,11 +13,11 @@ export class Follow {
   @PrimaryGeneratedColumn('uuid')
   follow_id: string;
 
-  @Column('uuid')
-  follower: string;
+  @ManyToOne(() => User, (user) => user.following, { onDelete: 'CASCADE' })
+  follower: User;
 
-  @Column('uuid')
-  following: string;
+  @ManyToOne(() => User, (user) => user.followers, { onDelete: 'CASCADE' })
+  following: User;
 
   @CreateDateColumn()
   createdAt: Date;

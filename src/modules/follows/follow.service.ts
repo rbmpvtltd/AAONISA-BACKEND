@@ -33,34 +33,41 @@ export class FollowService {
     if (!userToFollow) {
       throw new NotFoundException('User to follow not found');
     }
+    if (!userWhoFollow) {
+      throw new NotFoundException('User who follow not found');
+    }
 
     const alreadyFollowing = await this.followRepository.findOne({
-      where: { follower: followerId, following: followingId },
+      where: {
+        follower: { id: followerId },
+        following: { id: followingId }
+      },
     });
 
     if (alreadyFollowing) {
       throw new BadRequestException('You are already following this user');
     }
-
+    
     const follow = this.followRepository.create({
-      follower: followerId,
-      following: followingId,
+      follower: userWhoFollow,
+      following: userToFollow,
     });
 
     await this.followRepository.save(follow);
-    this.gateway.emitToUser(followingId, 'followState',`${followerId}` );
+    this.gateway.emitToUser(followingId, 'followState', `${followerId}`);
 
     return { message: 'Followed successfully', follow };
   }
 
   async unfollowUser(followerId: string, followingId: string) {
     const follow = await this.followRepository.findOne({
-      where: { follower: followerId, following: followingId },
+      where: {
+        follower: { id: followerId },
+        following: { id: followingId }
+      },
     });
 
-    if (!follow) {
-      throw new NotFoundException('Follow relationship not found');
-    }
+    if (!follow) throw new NotFoundException('Follow relationship not found');
 
     await this.followRepository.remove(follow);
 
