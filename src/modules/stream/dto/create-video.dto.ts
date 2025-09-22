@@ -2,8 +2,6 @@ import { IsString, IsEnum, IsUUID, IsOptional, IsArray } from 'class-validator';
 import { VideoType } from '../entities/video.entity';
 
 export class CreateVideoDto {
-  // @IsString()
-  // user_id: string;
 
   @IsString()
   title: string;
@@ -29,4 +27,10 @@ export class CreateVideoDto {
 
   @IsEnum(VideoType)
   type: VideoType;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  mentions?: string[];
+
 }

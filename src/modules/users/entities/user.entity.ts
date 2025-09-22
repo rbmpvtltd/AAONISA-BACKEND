@@ -4,6 +4,7 @@ import {
   Column,
   OneToMany,
   Check,
+  ManyToMany
 } from 'typeorm';
 import { Follow } from '../../follows/entities/follow.entity';
 import { Like } from '../../likes/entities/like.entity';
@@ -64,4 +65,7 @@ export class User {
 
   @OneToMany(() => Video, (video) => video.user_id, { cascade: true })
   videos: Video[];
+
+  @ManyToMany(() => Video, (video) => video.mentions)
+  mentionedIn: Video[];
 }

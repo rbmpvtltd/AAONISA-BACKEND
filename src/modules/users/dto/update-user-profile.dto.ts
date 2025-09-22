@@ -1,12 +1,6 @@
 import {IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class UpdateUserProfileDto{
-    // @IsNotEmpty()
-    // @IsString()
-    // token: string
-
-    // @IsOptional()
-    // profilePicture: string;
 
     @IsOptional()
     bio: string;
@@ -18,9 +12,6 @@ export class UpdateUserProfileDto{
     @IsOptional()
     @IsString()
     username?: string;
-
-    @IsString()
-    otp: string;
 
     @IsOptional()
     @IsString()

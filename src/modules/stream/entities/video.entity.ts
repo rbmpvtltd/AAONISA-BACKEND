@@ -5,6 +5,8 @@ import {
   ManyToOne,
   OneToMany,
   CreateDateColumn,
+  ManyToMany,
+  JoinTable
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Audio } from './audio.entity';
@@ -65,4 +67,8 @@ export class Video {
 
   @OneToMany(() => View, (view) => view.reel, { cascade: true })
   views: View[];
+
+  @ManyToMany(() => User, { cascade: false })
+  @JoinTable()
+  mentions: User[];
 }

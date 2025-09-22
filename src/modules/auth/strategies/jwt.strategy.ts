@@ -10,7 +10,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     super({
-      // Use Bearer token from Authorization header
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: process.env.SECRET_KEY,

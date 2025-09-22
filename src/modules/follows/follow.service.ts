@@ -54,7 +54,7 @@ export class FollowService {
     });
 
     await this.followRepository.save(follow);
-    this.gateway.emitToUser(followingId, 'followState', `${followerId}`);
+    this.gateway.emitToUser(followingId, 'followState', `${follow.follower}`);
 
     return { message: 'Followed successfully', follow };
   }
@@ -74,21 +74,26 @@ export class FollowService {
     return { message: 'Unfollowed successfully' };
   }
 
-  async getFollowState(userId) {
-    const user = await this.userRepository.find(userId);
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const followers = await this.followRepository.find({
-      where: { following: userId },
-      select: ["follower"],
-    });
-
-    const followings = await this.followRepository.find({ where: { follower: userId }, select: ["following"] });
-    return {
-      followers: followers.map(f => f.follower),
-      followings: followings.map(f => f.following)
-    };
+  async getFollowState(userId: string) {
+  const user = await this.userRepository.findOneBy({ id: userId });
+  if (!user) {
+    throw new Error("User not found");
   }
+
+  const followers = await this.followRepository.find({
+    where: { following: { id: userId } },
+    relations: ["follower"],
+  });
+
+  const followings = await this.followRepository.find({
+    where: { follower: { id: userId } },
+    relations: ["following"],
+  });
+
+  return {
+    followers: followers.map(f => f.follower.username),
+    followings: followings.map(f => f.following.username),
+  };
+}
+
 }
