@@ -36,7 +36,7 @@ export class FollowController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post('get-follow-state')
+  @Post('get-follow-state-and-userInfo')
   getFollowState(@Req() req) {
     const payload = req.user;
     const userId = payload?.sub || payload?.id || payload?.userId;

@@ -274,8 +274,7 @@ export class UserService {
       const existingUser = await this.userRepository.findOne({
         where: { username: dto.username },
       });
-
-      if (existingUser && existingUser.id !== userId) {
+      if (existingUser && existingUser.id !== user.id) {
         throw new BadRequestException('Username already taken');
       }
     }

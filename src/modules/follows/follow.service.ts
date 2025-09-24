@@ -51,7 +51,7 @@ export class FollowService {
     if (alreadyFollowing) {
       throw new BadRequestException('You are already following this user');
     }
-    
+
     const follow = this.followRepository.create({
       follower: userWhoFollow,
       following: userToFollow,
@@ -79,27 +79,32 @@ export class FollowService {
   }
 
   async getFollowState(userId: string) {
-  const user = await this.userRepository.findOneBy({ id: userId });
-  if (!user) {
-    throw new Error("User not found");
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['likes', 'views'],
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const followers = await this.followRepository.find({
+      where: { following: { id: userId } },
+      relations: ["follower"],
+    });
+
+    const followings = await this.followRepository.find({
+      where: { follower: { id: userId } },
+      relations: ["following"],
+
+    });
+
+    return {
+      userInfo: user,
+      userProfileInfo: await this.userProFileRepository.findOneBy({ user_id: userId }),
+      followers: followers.map(f => f.follower.username),
+      followings: followings.map(f => f.following.username),
+    };
   }
-
-  const followers = await this.followRepository.find({
-    where: { following: { id: userId } },
-    relations: ["follower"],
-  });
-
-  const followings = await this.followRepository.find({
-    where: { follower: { id: userId } },
-    relations: ["following"],
-  });
-
-  return {
-    userInfo: user,
-    userProfileInfo: await this.userProFileRepository.findOneBy({ user_id: userId }),
-    followers: followers.map(f => f.follower.username),
-    followings: followings.map(f => f.following.username),
-  };
-}
 
 }
