@@ -1,16 +1,25 @@
-// import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
+// src/share/entities/share.entity.ts
 
-// @Entity()
-// export class Share {
-//   @PrimaryGeneratedColumn("uuid")
-//   id: string;
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  Unique,
+} from 'typeorm';
 
-//   @Column()
-//   user_id: number;   // User ka ID store hoga
+@Unique(['user_id', 'reel_id'])
+@Entity('shares')
+export class Share {
+  @PrimaryGeneratedColumn('uuid')
+  share_id: string;
 
-//   @Column()
-//   post_id: number;   // Post ka ID store hoga
+  @Column('uuid')
+  reel_id: string;
 
-//   @CreateDateColumn()
-//   sharedAt: Date;    // Auto set hoga jab row create hogi
-// }
+  @Column('uuid')
+  user_id: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
+}

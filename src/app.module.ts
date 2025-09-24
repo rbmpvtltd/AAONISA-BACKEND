@@ -6,12 +6,12 @@ import { AppDataSource } from '../data-source';
 import { UserProfileModule } from './modules/users/user.module';
 import { LikeModule } from './modules/likes/like.module';
 import { ViewModule } from './modules/views/view.module';
-// import { ShareModule } from './modules/share/share.module';
-// import { PostsModule } from './modules/posts/posts.module';
-// import { ReelsModule } from './modules/reels/reels.module';
+import { ShareModule } from './modules/share/share.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { StreamModule } from './modules/stream/stream.module';
 import { FollowModule } from './modules/follows/follow.module';
+import { AppGateway } from './app.gateway';
+import { ApiOAuth2 } from '@nestjs/swagger';
 @Module({
   imports: [ 
     ConfigModule.forRoot({ isGlobal: true }),
@@ -31,11 +31,9 @@ import { FollowModule } from './modules/follows/follow.module';
     FollowModule,
     LikeModule,
     ViewModule,
-    // ShareModule,
-    // PostsModule,
-    // ReelsModule
+    ShareModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [AppGateway],
 })
 export class AppModule { }

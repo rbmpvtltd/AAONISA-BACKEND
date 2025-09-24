@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { Request } from 'express';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -9,16 +8,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!process.env.SECRET_KEY) {
       throw new Error('SECRET_KEY environment variable is not set');
     }
-
     super({
-      jwtFromRequest: ExtractJwt.fromExtractors([
-        (req: Request) => req?.cookies?.accessToken
-      ]),
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: process.env.SECRET_KEY,
+      passReqToCallback: true,
     });
   }
-  async validate(payload: any) {
-    return { userId: payload.sub};
+
+  async validate(req: any, payload: any) {
+    const token = req.headers.authorization?.split(' ')[1];
+    console.log('Original JWT token:', token);
+    console.log('JWT payload (if valid):', payload);
+
+    return { userId: payload.sub };
   }
 }

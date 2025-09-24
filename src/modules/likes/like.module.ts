@@ -17,8 +17,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Like } from './entities/like.entity';
 import { LikeService } from './like.service';
 import { LikeController } from './like.controller';
+
+import { User } from '../users/entities/user.entity';   
+import { Video } from "../stream/entities/video.entity";
 @Module({
-  imports: [TypeOrmModule.forFeature([Like])],
+  imports: [TypeOrmModule.forFeature([Like, User, Video])],
   controllers:[LikeController],
   providers: [LikeService],
   exports: [LikeService],

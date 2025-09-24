@@ -57,13 +57,13 @@ export class UserController {
     return this.userService.verifyOtp(dto);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Post('update-profile-send-otp')
-  updateProfileOtp(@Req() req) {
-    const payload = req.user;
-    const userId = payload?.sub || payload?.id || payload?.userId;
-    return this.userService.updateProfileOtp(userId.toString());
-  }
+  // @UseGuards(JwtAuthGuard)
+  // @Post('update-profile-send-otp')
+  // updateProfileOtp(@Req() req) {
+  //   const payload = req.user;
+  //   const userId = payload?.sub || payload?.id || payload?.userId;
+  //   return this.userService.updateProfileOtp(userId.toString());
+  // }
 
   @UseGuards(JwtAuthGuard)
   @Post('update-email-send-otp')
@@ -103,7 +103,7 @@ export class UserController {
       cb(null, true);
     }
   },
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
 }))
   async updateProfile(
     @Req() req,

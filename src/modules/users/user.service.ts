@@ -18,7 +18,6 @@ import { OtpService } from '../otp/otp.service';
 import { EmailService } from '../otp/email.service';
 import { SmsService } from '../otp/sms.service';
 
-
 @Injectable()
 export class UserService {
   constructor(
@@ -96,6 +95,7 @@ export class UserService {
 
     const userProfile = this.userProfileRepository.create({
       user_id: savedUser.id,
+      name: savedUser.username,
       role: dto.role,
       paid: false,
       star: 1,
@@ -240,22 +240,22 @@ export class UserService {
     return { message: 'Password reset successfully', success: true };
   }
 
-  async updateProfileOtp(userId: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+  // async updateProfileOtp(userId: string) {
+  //   const user = await this.userRepository.findOne({ where: { id: userId } });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-    const phone_no = user.phone_no;
-    const email = user.email;
-    const otp = await this.otpService.generateOtp({
-      userId
-    })
+  //   if (!user) {
+  //     throw new NotFoundException('User not found');
+  //   }
+  //   const phone_no = user.phone_no;
+  //   const email = user.email;
+  //   const otp = await this.otpService.generateOtp({
+  //     userId
+  //   })
 
-    if (email) await this.emailService.sendOtp(email, otp);
-    if (phone_no) await this.smsService.sendOtpSms(phone_no, otp);
-    return { message: 'OTP sent for verification', success: true };
-  }
+  //   if (email) await this.emailService.sendOtp(email, otp);
+  //   if (phone_no) await this.smsService.sendOtpSms(phone_no, otp);
+  //   return { message: 'OTP sent for verification', success: true };
+  // }
 
   async updateProfile(dto: UpdateUserProfileDto, payload: any, file?: Multer.File) {
     const userId = payload?.sub || payload?.id || payload?.userId;
@@ -270,21 +270,11 @@ export class UserService {
       throw new NotFoundException('User not found');
     }
 
-    const isValid = await this.otpService.validateOtp({
-      userId,
-      code: dto.otp,
-    });
-
-    if (!isValid) {
-      throw new BadRequestException('Invalid or expired OTP');
-    }
-
     if (dto.username) {
       const existingUser = await this.userRepository.findOne({
         where: { username: dto.username },
       });
-
-      if (existingUser && existingUser.id !== userId) {
+      if (existingUser && existingUser.id !== user.id) {
         throw new BadRequestException('Username already taken');
       }
     }
@@ -413,4 +403,7 @@ export class UserService {
     };
   }
 
+  async getFollowState(){
+
+  }
 } 

@@ -1,26 +1,24 @@
-// src/like/entities/like.entity.ts
-
 import {
   Entity,
   PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
   ManyToOne,
-  JoinColumn,
+  CreateDateColumn,
   Unique,
 } from 'typeorm';
+import { User } from '../../users/entities/user.entity';
+import { Video } from '../../stream/entities/video.entity';
 
-@Unique(['user_id', 'reel_id'])
+@Unique(['user', 'reel'])
 @Entity('likes')
 export class Like {
   @PrimaryGeneratedColumn('uuid')
   like_id: string;
 
-  @Column('uuid')
-  reel_id: string;
+  @ManyToOne(() => Video, (video) => video.likes, { onDelete: 'CASCADE' })
+  reel: Video;
 
-  @Column('uuid')
-  user_id: string;
+  @ManyToOne(() => User, (user) => user.likes, { onDelete: 'CASCADE' })
+  user: User;
 
   @CreateDateColumn()
   createdAt: Date;

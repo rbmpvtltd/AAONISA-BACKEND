@@ -1,28 +1,25 @@
-// src/view/entities/view.entity.ts
-
 import {
   Entity,
   PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
   ManyToOne,
-  JoinColumn,
+  CreateDateColumn,
   Unique,
 } from 'typeorm';
+import { User } from '../../users/entities/user.entity';
+import { Video } from '../../stream/entities/video.entity';
 
-@Unique(['user_id', 'reel_id'])
+@Unique(['user', 'reel'])
 @Entity('views')
 export class View {
   @PrimaryGeneratedColumn('uuid')
   view_id: string;
 
-  @Column('uuid')
-  user_id: string;
+  @ManyToOne(() => User, (user) => user.views, { onDelete: 'CASCADE' })
+  user: User;
 
-  @Column('uuid')
-  reel_id: string;
+  @ManyToOne(() => Video, (video) => video.views, { onDelete: 'CASCADE' })
+  reel: Video;
 
- 
   @CreateDateColumn()
   createdAt: Date;
 }
