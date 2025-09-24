@@ -130,14 +130,14 @@ export class VideoService {
             mentions: mentionedUsers,
         });
 
-         await this.videoRepository.save(video);
+        await this.videoRepository.save(video);
 
         for (const mentionedUser of mentionedUsers) {
             this.gateway.emitToUser(
                 mentionedUser.id,
                 'mentioned_in_video',
                 {
-                    reelUsername: user.username,
+                    whoMentioned: user.username,
                     videoId: video.uuid
                 }
             );

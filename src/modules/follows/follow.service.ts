@@ -6,6 +6,8 @@ import { Repository } from 'typeorm';
 import { Follow } from './entities/follow.entity';
 import { User } from '../users/entities/user.entity';
 import { AppGateway } from 'src/app.gateway';
+import { userInfo } from 'os';
+import { UserProfile } from '../users/entities/user-profile.entity';
 @Injectable()
 export class FollowService {
   constructor(
@@ -14,6 +16,8 @@ export class FollowService {
 
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(UserProfile)
+    private readonly userProFileRepository: Repository<UserProfile>,
     private readonly gateway: AppGateway
   ) { }
 
@@ -91,6 +95,8 @@ export class FollowService {
   });
 
   return {
+    userInfo: user,
+    userProfileInfo: await this.userProFileRepository.findOneBy({ user_id: userId }),
     followers: followers.map(f => f.follower.username),
     followings: followings.map(f => f.following.username),
   };

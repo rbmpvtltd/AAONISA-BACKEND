@@ -270,15 +270,6 @@ export class UserService {
       throw new NotFoundException('User not found');
     }
 
-    // const isValid = await this.otpService.validateOtp({
-    //   userId,
-    //   code: dto.otp,
-    // });
-
-    // if (!isValid) {
-    //   throw new BadRequestException('Invalid or expired OTP');
-    // }
-
     if (dto.username) {
       const existingUser = await this.userRepository.findOne({
         where: { username: dto.username },
