@@ -17,7 +17,8 @@ import { AuthService } from '../auth/auth.service';
 import { OtpService } from '../otp/otp.service';
 import { EmailService } from '../otp/email.service';
 import { SmsService } from '../otp/sms.service';
-
+const fs = require('fs');
+const path = require('path');
 @Injectable()
 export class UserService {
   constructor(
@@ -259,7 +260,7 @@ export class UserService {
 
   async updateProfile(dto: UpdateUserProfileDto, payload: any, file?: Multer.File) {
     const userId = payload?.sub || payload?.id || payload?.userId;
-
+    let dataUrl = ''
     if (!userId) {
       throw new UnauthorizedException('Invalid token');
     }
@@ -280,9 +281,34 @@ export class UserService {
     }
 
     if (file) {
+      const filePath = path.join(process.cwd(), 'src', 'uploads', 'profiles', file.filename);
+      const fileBuffer = fs.readFileSync(filePath);
+      const base64Data = fileBuffer.toString('base64');
+      dataUrl = `data:${file.mimetype};base64,${base64Data}`;
       userProfile.ProfilePicture = `../../uploads/profiles/${file.filename}`;
+      console.log('Base64 Data URL:', dataUrl);
     }
 
+    if (dto.imageChanged && !file) {
+      const uploadDir = path.join(process.cwd(), 'src', 'uploads', 'profiles');
+      fs.readdir(uploadDir, (err, files) => {
+        if (err) {
+          console.error("Error reading upload directory:", err);
+          return;
+        }
+
+        const userFiles = files.filter(f => f.startsWith(userId));
+
+        userFiles.forEach(f => {
+          const filePath = path.join(uploadDir, f);
+          fs.unlink(filePath, (err) => {
+            if (err) console.error("Error deleting file:", err);
+            else console.log(`Deleted file: ${filePath}`);
+          });
+        });
+      });
+      userProfile.ProfilePicture = '';
+    }
     userProfile.name = dto.name || userProfile.name;
     userProfile.bio = dto.bio || userProfile.bio;
     userProfile.url = dto.url || userProfile.url;
@@ -293,6 +319,7 @@ export class UserService {
     }
     return {
       message: 'Profile updated successfully',
+      dataUrl,
       success: true,
     };
   }
@@ -403,7 +430,7 @@ export class UserService {
     };
   }
 
-  async getFollowState(){
+  async getFollowState() {
 
   }
 } 
