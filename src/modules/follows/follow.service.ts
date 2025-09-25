@@ -8,6 +8,9 @@ import { User } from '../users/entities/user.entity';
 import { AppGateway } from 'src/app.gateway';
 import { userInfo } from 'os';
 import { UserProfile } from '../users/entities/user-profile.entity';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
+import { lookup} from 'mime-types'
 @Injectable()
 export class FollowService {
   constructor(
@@ -78,33 +81,80 @@ export class FollowService {
     return { message: 'Unfollowed successfully' };
   }
 
+  // async getFollowState(userId: string) {
+  //   const user = await this.userRepository.findOne({
+  //     where: { id: userId },
+  //     relations: ['likes', 'views'],
+  //   });
+
+  //   if (!user) {
+  //     throw new Error("User not found");
+  //   }
+
+  //   const followers = await this.followRepository.find({
+  //     where: { following: { id: userId } },
+  //     relations: ["follower"],
+  //   });
+
+  //   const followings = await this.followRepository.find({
+  //     where: { follower: { id: userId } },
+  //     relations: ["following"],
+
+  //   });
+
+  //   return {
+  //     userInfo: user,
+  //     userProfileInfo: await this.userProFileRepository.findOneBy({ user_id: userId }),
+  //     followers: followers.map(f => f.follower.username),
+  //     followings: followings.map(f => f.following.username),
+  //   };
+  // }
   async getFollowState(userId: string) {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['likes', 'views'],
-    });
+  const user = await this.userRepository.findOne({
+    where: { id: userId },
+    relations: ['likes', 'views','videos'],
+  });
 
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const followers = await this.followRepository.find({
-      where: { following: { id: userId } },
-      relations: ["follower"],
-    });
-
-    const followings = await this.followRepository.find({
-      where: { follower: { id: userId } },
-      relations: ["following"],
-
-    });
-
-    return {
-      userInfo: user,
-      userProfileInfo: await this.userProFileRepository.findOneBy({ user_id: userId }),
-      followers: followers.map(f => f.follower.username),
-      followings: followings.map(f => f.following.username),
-    };
+  if (!user) {
+    throw new Error("User not found");
   }
 
+  // followers & followings
+  const followers = await this.followRepository.find({
+    where: { following: { id: userId } },
+    relations: ["follower"],
+  });
+
+  const followings = await this.followRepository.find({
+    where: { follower: { id: userId } },
+    relations: ["following"],
+  });
+
+  // userProfileInfo
+  const userProfileInfo = await this.userProFileRepository.findOneBy({ user_id: userId });
+  let profilePictureBase64: string | null = null;
+  let mimeType = 'image/jpeg'
+  if (userProfileInfo && userProfileInfo.ProfilePicture) {
+    const filename = userProfileInfo.ProfilePicture.split('/').pop() || '';
+    try {
+      const filePath = join(process.cwd(),'src','uploads','profiles',filename);
+      const fileBuffer = await readFile(filePath);
+      mimeType = lookup(filename) || 'image/jpeg';
+      profilePictureBase64 = fileBuffer.toString('base64');
+    } catch (err) {
+      console.error("Failed to read profile picture:", err);
+      profilePictureBase64 = null;
+    }
+  }
+
+  return {
+    userInfo: user,
+    userProfileInfo: {
+      ...userProfileInfo,
+      ProfilePicture: `data:${mimeType};base64,${profilePictureBase64}`
+    },
+    followers: followers.map(f => f.follower.username),
+    followings: followings.map(f => f.following.username),
+  };
+}
 }
