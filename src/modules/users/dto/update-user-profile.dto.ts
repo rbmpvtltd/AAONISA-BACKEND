@@ -1,4 +1,4 @@
-import {IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {IsNotEmpty, IsOptional, IsString, IsBoolean } from 'class-validator';
 
 export class UpdateUserProfileDto{
 
@@ -16,4 +16,7 @@ export class UpdateUserProfileDto{
     @IsOptional()
     @IsString()
     url?: string
+
+    @IsBoolean()
+    imageChanged: boolean
 }
