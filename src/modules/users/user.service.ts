@@ -286,7 +286,6 @@ export class UserService {
       const base64Data = fileBuffer.toString('base64');
       dataUrl = `data:${file.mimetype};base64,${base64Data}`;
       userProfile.ProfilePicture = `../../uploads/profiles/${file.filename}`;
-      console.log('Base64 Data URL:', dataUrl);
     }
 
     if (dto.imageChanged && !file) {

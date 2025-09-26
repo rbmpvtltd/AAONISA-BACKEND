@@ -2,7 +2,7 @@
 
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, QueryBuilder } from 'typeorm';
 import { Follow } from './entities/follow.entity';
 import { User } from '../users/entities/user.entity';
 import { AppGateway } from 'src/app.gateway';
@@ -10,7 +10,8 @@ import { userInfo } from 'os';
 import { UserProfile } from '../users/entities/user-profile.entity';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
-import { lookup} from 'mime-types'
+import { lookup } from 'mime-types'
+import * as sharp from 'sharp';
 @Injectable()
 export class FollowService {
   constructor(
@@ -23,7 +24,7 @@ export class FollowService {
     private readonly userProFileRepository: Repository<UserProfile>,
     private readonly gateway: AppGateway
   ) { }
-
+  
   async followUser(followerId: string, followingId: string) {
     if (followerId === followingId) {
       throw new BadRequestException("You can't follow yourself");
@@ -109,35 +110,106 @@ export class FollowService {
   //     followings: followings.map(f => f.following.username),
   //   };
   // }
+  
   async getFollowState(userId: string) {
   const user = await this.userRepository.findOne({
     where: { id: userId },
-    relations: ['likes', 'views','videos'],
+    relations: ['likes', 'views', 'videos'],
   });
 
   if (!user) {
     throw new Error("User not found");
   }
 
-  // followers & followings
-  const followers = await this.followRepository.find({
-    where: { following: { id: userId } },
-    relations: ["follower"],
-  });
+  // Helper function to generate thumbnail base64
+  async function getThumbnailBase64(filePath: string, width = 50, height = 50): Promise<string | null> {
+    try {
+      const buffer = await readFile(filePath);
+      const resizedBuffer = await sharp(buffer)
+        .resize(width, height, { fit: 'cover' })
+        .jpeg({ quality: 70 }) // compress to reduce size
+        .toBuffer();
+      const filename = filePath.split('/').pop() || '';
+      const mimeType = lookup(filename) || 'image/jpeg';
+      return `data:${mimeType};base64,${resizedBuffer.toString('base64')}`;
+    } catch (err) {
+      console.error('Failed to generate thumbnail:', err);
+      return null;
+    }
+  }
 
-  const followings = await this.followRepository.find({
-    where: { follower: { id: userId } },
-    relations: ["following"],
-  });
+  // Followers
+  const followers = await this.followRepository
+    .createQueryBuilder("follows")
+    .leftJoin(UserProfile, "user_profile", `"user_profile"."user_id"::uuid = "follows"."followerId"`)
+    .leftJoin(User, "user", `"user"."id" = "follows"."followerId"`)
+    .select([
+      `"follows"."followerId" AS id`,
+      `"user"."username" AS username`,
+      `"user_profile"."name" AS name`,
+      `"user_profile"."ProfilePicture" AS userProfilePicture`
+    ])
+    .where(`"follows"."followingId"::uuid = :userId`, { userId })
+    .getRawMany();
 
-  // userProfileInfo
+  // Followings
+  const followings = await this.followRepository
+    .createQueryBuilder("follows")
+    .leftJoin(UserProfile, "user_profile", `"user_profile"."user_id"::uuid = "follows"."followingId"`)
+    .leftJoin(User, "user", `"user"."id" = "follows"."followingId"`)
+    .select([
+      `"follows"."followingId" AS id`,
+      `"user"."username" AS username`,
+      `"user_profile"."name" AS name`,
+      `"user_profile"."ProfilePicture" AS userProfilePicture`
+    ])
+    .where(`"follows"."followerId"::uuid = :userId`, { userId })
+    .getRawMany();
+
+  // Convert followers profile pictures to thumbnails
+  const followersWithThumbs = await Promise.all(
+    followers.map(async (f) => {
+      let thumb: string | null = null;
+      if (f.userProfilePicture) {
+        const filePath = join(
+          process.cwd(),
+          'src',
+          'uploads',
+          'profiles',
+          f.userProfilePicture.split('/').pop() || ''
+        );
+        thumb = await getThumbnailBase64(filePath, 50, 50);
+      }
+      return { ...f, userProfilePicture: thumb };
+    })
+  );
+
+  // Convert followings profile pictures to thumbnails
+  const followingsWithThumbs = await Promise.all(
+    followings.map(async (f) => {
+      let thumb: string | null = null;
+      if (f.userProfilePicture) {
+        const filePath = join(
+          process.cwd(),
+          'src',
+          'uploads',
+          'profiles',
+          f.userProfilePicture.split('/').pop() || ''
+        );
+        thumb = await getThumbnailBase64(filePath, 50, 50);
+      }
+      return { ...f, userProfilePicture: thumb };
+    })
+  );
+
+  // User's own profile picture
   const userProfileInfo = await this.userProFileRepository.findOneBy({ user_id: userId });
   let profilePictureBase64: string | null = null;
-  let mimeType = 'image/jpeg'
+  let mimeType = 'image/jpeg';
   if (userProfileInfo && userProfileInfo.ProfilePicture) {
     const filename = userProfileInfo.ProfilePicture.split('/').pop() || '';
     try {
-      const filePath = join(process.cwd(),'src','uploads','profiles',filename);
+      const filePath = join(process.cwd(), 'src', 'uploads', 'profiles', filename);
       const fileBuffer = await readFile(filePath);
       mimeType = lookup(filename) || 'image/jpeg';
       profilePictureBase64 = fileBuffer.toString('base64');
@@ -153,8 +225,10 @@ export class FollowService {
       ...userProfileInfo,
       ProfilePicture: `data:${mimeType};base64,${profilePictureBase64}`
     },
-    followers: followers.map(f => f.follower.username),
-    followings: followings.map(f => f.following.username),
+    followers: followersWithThumbs,
+    followings: followingsWithThumbs,
   };
 }
+
+  
 }
