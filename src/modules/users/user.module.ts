@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserController } from './user.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -11,12 +11,13 @@ import { Video} from '../stream/entities/video.entity'
 import { Like } from '../likes/entities/like.entity';
 import { View } from '../views/entities/view.entity'; 
 import { Follow } from '../follows/entities/follow.entity'; 
-
+import { NotificationModule } from '../notifications/notification.module';
 @Module({
   imports: [TypeOrmModule.forFeature([UserProfile,User,Video,Like,View,Follow]),
   AuthModule,
   TypeOrmModule.forFeature([User]),
   OtpModule,
+  forwardRef(() => NotificationModule),
 ],
   providers: [UserService],
   controllers: [UserController],
