@@ -10,6 +10,7 @@ import { Follow } from '../../follows/entities/follow.entity';
 import { Like } from '../../likes/entities/like.entity';
 import { View } from '../../views/entities/view.entity';
 import { Video } from '../../stream/entities/video.entity';
+import { Notification } from '../../notifications/entities/notification.entity';
 
 export enum UserRole {
   USER = 'user',
@@ -68,4 +69,11 @@ export class User {
 
   @ManyToMany(() => Video, (video) => video.mentions)
   mentionedIn: Video[];
+
+  @OneToMany(() => Notification, (notification) => notification.sender)
+  notificationsSent: Notification[];
+
+  // jo user ko mili
+  @OneToMany(() => Notification, (notification) => notification.recipient)
+  notificationsReceived: Notification[];
 }
