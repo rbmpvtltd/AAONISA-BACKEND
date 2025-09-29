@@ -13,10 +13,12 @@ import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dt
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto'
 import { UpdateUserEmail, UpdateUserPhone } from './dto/update-user.dto'
 import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
+import { UploadService } from '../upload/upload.service';
 import { AuthService } from '../auth/auth.service';
 import { OtpService } from '../otp/otp.service';
 import { EmailService } from '../otp/email.service';
 import { SmsService } from '../otp/sms.service';
+import { extname } from 'path';
 const fs = require('fs');
 const path = require('path');
 @Injectable()
@@ -29,7 +31,8 @@ export class UserService {
     private readonly authService: AuthService,
     private readonly otpService: OtpService,
     private readonly emailService: EmailService,
-    private readonly smsService: SmsService
+    private readonly smsService: SmsService,
+    private readonly uploadService: UploadService
   ) { }
 
   async preRegisterCheck(dto: { emailOrPhone: string; username: string }) {
@@ -260,62 +263,59 @@ export class UserService {
 
   async updateProfile(dto: UpdateUserProfileDto, payload: any, file?: Multer.File) {
     const userId = payload?.sub || payload?.id || payload?.userId;
-    let dataUrl = ''
-    if (!userId) {
-      throw new UnauthorizedException('Invalid token');
-    }
+    if (!userId) throw new UnauthorizedException('Invalid token');
 
     const user = await this.userRepository.findOne({ where: { id: userId } });
     const userProfile = await this.userProfileRepository.findOne({ where: { user_id: userId } });
-    if (!user || !userProfile) {
-      throw new NotFoundException('User not found');
-    }
+    if (!user || !userProfile) throw new NotFoundException('User not found');
 
+    // Username check
     if (dto.username) {
-      const existingUser = await this.userRepository.findOne({
-        where: { username: dto.username },
-      });
-      if (existingUser && existingUser.id !== user.id) {
+      const existingUser = await this.userRepository.findOne({ where: { username: dto.username } });
+      if (existingUser && existingUser.id !== user.id)
         throw new BadRequestException('Username already taken');
-      }
     }
 
+    let dataUrl = '';
+
+    // Upload new file
     if (file) {
-      const filePath = path.join(process.cwd(), 'src', 'uploads', 'profiles', file.filename);
-      const fileBuffer = fs.readFileSync(filePath);
-      const base64Data = fileBuffer.toString('base64');
-      dataUrl = `data:${file.mimetype};base64,${base64Data}`;
-      userProfile.ProfilePicture = `../../uploads/profiles/${file.filename}`;
+      const customName = `${userId}${extname(file.originalname)}`;
+
+      // Delete old profile picture if exists
+      if (userProfile.ProfilePicture) {
+        const oldKey = userProfile.ProfilePicture.split('.com/')[1];
+        if (oldKey) {
+          await this.uploadService.deleteFile(oldKey);
+        }
+      }
+
+      const uploaded = await this.uploadService.uploadFile(file, 'profiles', customName);
+
+      // Optional: Base64
+      dataUrl = uploaded.publicUrl;
+      
+      userProfile.ProfilePicture = uploaded.url;
     }
 
-    if (dto.imageChanged && !file) {
-      const uploadDir = path.join(process.cwd(), 'src', 'uploads', 'profiles');
-      fs.readdir(uploadDir, (err, files) => {
-        if (err) {
-          console.error("Error reading upload directory:", err);
-          return;
-        }
-
-        const userFiles = files.filter(f => f.startsWith(userId));
-
-        userFiles.forEach(f => {
-          const filePath = path.join(uploadDir, f);
-          fs.unlink(filePath, (err) => {
-            if (err) console.error("Error deleting file:", err);
-            else console.log(`Deleted file: ${filePath}`);
-          });
-        });
-      });
+    // If imageChanged but no new file, delete existing
+    if (dto.imageChanged && !file && userProfile.ProfilePicture) {
+      const oldKey = userProfile.ProfilePicture.split('.com/')[1];
+      await this.uploadService.deleteFile(oldKey);
       userProfile.ProfilePicture = '';
     }
+
+    // Update other profile fields
     userProfile.name = dto.name || userProfile.name;
     userProfile.bio = dto.bio || userProfile.bio;
     userProfile.url = dto.url || userProfile.url;
     await this.userProfileRepository.save(userProfile);
+
     if (dto.username) {
       user.username = dto.username;
       await this.userRepository.save(user);
     }
+
     return {
       message: 'Profile updated successfully',
       dataUrl,

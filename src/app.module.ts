@@ -10,6 +10,7 @@ import { ShareModule } from './modules/share/share.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { StreamModule } from './modules/stream/stream.module';
 import { FollowModule } from './modules/follows/follow.module';
+import { UploadModule } from './modules/upload/upload.module';
 import { AppGateway } from './app.gateway';
 import { ApiOAuth2 } from '@nestjs/swagger';
 @Module({
@@ -32,6 +33,7 @@ import { ApiOAuth2 } from '@nestjs/swagger';
     LikeModule,
     ViewModule,
     ShareModule,
+    UploadModule
   ],
   controllers: [],
   providers: [AppGateway],

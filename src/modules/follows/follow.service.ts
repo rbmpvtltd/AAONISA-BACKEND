@@ -8,6 +8,7 @@ import { User } from '../users/entities/user.entity';
 import { AppGateway } from 'src/app.gateway';
 import { userInfo } from 'os';
 import { UserProfile } from '../users/entities/user-profile.entity';
+import { UploadService } from '../upload/upload.service';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { lookup } from 'mime-types'
@@ -22,7 +23,8 @@ export class FollowService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(UserProfile)
     private readonly userProFileRepository: Repository<UserProfile>,
-    private readonly gateway: AppGateway
+    private readonly gateway: AppGateway,
+    private readonly uploadService: UploadService
   ) { }
   
   async followUser(followerId: string, followingId: string) {
@@ -116,27 +118,7 @@ export class FollowService {
     where: { id: userId },
     relations: ['likes', 'views', 'videos'],
   });
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  // Helper function to generate thumbnail base64
-  async function getThumbnailBase64(filePath: string, width = 50, height = 50): Promise<string | null> {
-    try {
-      const buffer = await readFile(filePath);
-      const resizedBuffer = await sharp(buffer)
-        .resize(width, height, { fit: 'cover' })
-        .jpeg({ quality: 70 }) // compress to reduce size
-        .toBuffer();
-      const filename = filePath.split('/').pop() || '';
-      const mimeType = lookup(filename) || 'image/jpeg';
-      return `data:${mimeType};base64,${resizedBuffer.toString('base64')}`;
-    } catch (err) {
-      console.error('Failed to generate thumbnail:', err);
-      return null;
-    }
-  }
+  if (!user) throw new Error("User not found");
 
   // Followers
   const followers = await this.followRepository
@@ -166,67 +148,49 @@ export class FollowService {
     .where(`"follows"."followerId"::uuid = :userId`, { userId })
     .getRawMany();
 
-  // Convert followers profile pictures to thumbnails
-  const followersWithThumbs = await Promise.all(
-    followers.map(async (f) => {
-      let thumb: string | null = null;
-      if (f.userProfilePicture) {
-        const filePath = join(
-          process.cwd(),
-          'src',
-          'uploads',
-          'profiles',
-          f.userProfilePicture.split('/').pop() || ''
-        );
-        thumb = await getThumbnailBase64(filePath, 50, 50);
-      }
-      return { ...f, userProfilePicture: thumb };
-    })
+  // Helper to generate signed URL
+  const toSignedUrl = async (path: string | null): Promise<string | null> => {
+    if (!path) return null;
+    const key = path.split('/').pop();
+    if (!key) return null;
+    const bucket = 'profiles';
+    const fullKey = `${bucket}/${key}`;
+    try {
+      return await this.uploadService.getFileUrl(fullKey, 3600); // valid 1 hour
+    } catch (err) {
+      console.error('Failed to generate signed URL:', err);
+      return null;
+    }
+  };
+
+  // Followers with signed URLs
+  const followersWithUrls = await Promise.all(
+    followers.map(async f => ({
+      ...f,
+      userProfilePicture: await toSignedUrl(f.userprofilepicture)
+    }))
   );
 
-  // Convert followings profile pictures to thumbnails
-  const followingsWithThumbs = await Promise.all(
-    followings.map(async (f) => {
-      let thumb: string | null = null;
-      if (f.userProfilePicture) {
-        const filePath = join(
-          process.cwd(),
-          'src',
-          'uploads',
-          'profiles',
-          f.userProfilePicture.split('/').pop() || ''
-        );
-        thumb = await getThumbnailBase64(filePath, 50, 50);
-      }
-      return { ...f, userProfilePicture: thumb };
-    })
+  // Followings with signed URLs
+  const followingsWithUrls = await Promise.all(
+    followings.map(async f => ({
+      ...f,
+      userProfilePicture: await toSignedUrl(f.userprofilepicture)
+    }))
   );
 
   // User's own profile picture
   const userProfileInfo = await this.userProFileRepository.findOneBy({ user_id: userId });
-  let profilePictureBase64: string | null = null;
-  let mimeType = 'image/jpeg';
-  if (userProfileInfo && userProfileInfo.ProfilePicture) {
-    const filename = userProfileInfo.ProfilePicture.split('/').pop() || '';
-    try {
-      const filePath = join(process.cwd(), 'src', 'uploads', 'profiles', filename);
-      const fileBuffer = await readFile(filePath);
-      mimeType = lookup(filename) || 'image/jpeg';
-      profilePictureBase64 = fileBuffer.toString('base64');
-    } catch (err) {
-      console.error("Failed to read profile picture:", err);
-      profilePictureBase64 = null;
-    }
-  }
+  const profilePictureSignedUrl = await toSignedUrl(userProfileInfo?.ProfilePicture || null);
 
   return {
     userInfo: user,
     userProfileInfo: {
       ...userProfileInfo,
-      ProfilePicture: `data:${mimeType};base64,${profilePictureBase64}`
+      ProfilePicture: profilePictureSignedUrl
     },
-    followers: followersWithThumbs,
-    followings: followingsWithThumbs,
+    followers: followersWithUrls,
+    followings: followingsWithUrls,
   };
 }
 

@@ -1,9 +1,11 @@
-import { Body, Controller, Post, Req, Res, UseGuards,UseInterceptors,
-  UploadedFile, } from '@nestjs/common';
+import {
+  Body, Controller, Post, Req, Res, UseGuards, UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
 import { UserService } from './user.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, PreRegisterDto } from './dto/create-user.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage,Multer } from 'multer';
+import { diskStorage, Multer } from 'multer';
 import { extname } from 'path';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto'
 import { UpdateEmailOtp, UpdatePhoneOtp, UpdateUserEmail, UpdateUserPhone } from './dto/update-user.dto'
@@ -21,8 +23,8 @@ export class UserController {
   }
 
   @Post('verify-otp-and-register')
-  register(@Body() dto: RegisterDto,@Res() res:Response) {
-    return this.userService.register(dto,res);
+  register(@Body() dto: RegisterDto, @Res() res: Response) {
+    return this.userService.register(dto, res);
   }
 
   @Post('login')
@@ -67,7 +69,7 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Post('update-email-send-otp')
-  updateEmailOtp(@Req() req ,@Body() dto:UpdateEmailOtp) {
+  updateEmailOtp(@Req() req, @Body() dto: UpdateEmailOtp) {
     const payload = req.user;
     const userId = payload?.sub || payload?.id || payload?.userId;
     return this.userService.updateEmailOtp(dto);
@@ -75,7 +77,7 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Post('update-phone-send-otp')
-  updatePhoneOtp(@Req() req,@Body() dto:UpdatePhoneOtp) {
+  updatePhoneOtp(@Req() req, @Body() dto: UpdatePhoneOtp) {
     const payload = req.user;
     const userId = payload?.sub || payload?.id || payload?.userId;
     return this.userService.updatePhoneOtp(dto);
@@ -83,48 +85,28 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Post('update-profile')
-  @UseInterceptors(FileInterceptor('ProfilePicture', {
-  storage: diskStorage({
-    destination: (req, file, cb) => {
-      const uploadPath = path.join('src', 'uploads', 'profiles');
-      cb(null, uploadPath);
-    },
-    filename: (req, file, cb) => {
-      const userId = req.user?.sub || req.user?.id || req.user?.userId;
-      const fileExtName = extname(file.originalname);
-      const fileName = `${userId}${fileExtName}`;
-      cb(null, fileName);
-    },
-  }),
-  fileFilter: (req, file, cb) => {
-    if (!file.mimetype.match(/\/(jpg|jpeg|png)$/)) {
-      cb(new Error('Only image files are allowed!'), false);
-    } else {
-      cb(null, true);
-    }
-  },
-  limits: { fileSize: 5 * 1024 * 1024 },
-}))
+  @UseInterceptors(FileInterceptor('ProfilePicture'))
   async updateProfile(
     @Req() req,
     @Body() dto: UpdateUserProfileDto,
-    @UploadedFile() file: Multer.File
+    @UploadedFile() file: Multer.File,
   ) {
     const payload = req.user;
     return this.userService.updateProfile(dto, payload, file);
   }
 
+
   @UseGuards(JwtAuthGuard)
   @Post('update-user-email')
   updateUserEmail(@Req() req, @Body() dto: UpdateUserEmail) {
     const payload = req.user
-    return this.userService.updateUserEmail(dto,payload);
+    return this.userService.updateUserEmail(dto, payload);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('update-user-phone')
   updateUserPhone(@Req() req, @Body() dto: UpdateUserPhone) {
     const payload = req.user
-    return this.userService.updateUserPhone(dto,payload);
+    return this.userService.updateUserPhone(dto, payload);
   }
 }

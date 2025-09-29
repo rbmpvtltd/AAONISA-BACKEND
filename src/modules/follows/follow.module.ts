@@ -8,11 +8,11 @@ import { User } from '../users/entities/user.entity';
 import { FollowController } from './follow.controller';
 import { AppGateway } from 'src/app.gateway';
 import { UserProfile } from '../users/entities/user-profile.entity';
-
+import { UploadService } from '../upload/upload.service';
 @Module({
   imports: [TypeOrmModule.forFeature([Follow, User,UserProfile])],
   controllers: [FollowController],
-  providers: [FollowService,AppGateway],
+  providers: [FollowService,AppGateway,UploadService],
   exports: [FollowService],
 })
 export class FollowModule {}
