@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { Video } from './entities/video.entity';
+import { Video, VideoType } from './entities/video.entity';
 import { Audio } from './entities/audio.entity';
 import { CreateVideoDto } from './dto/create-video.dto';
 import * as ffmpeg from 'fluent-ffmpeg';
@@ -11,7 +11,27 @@ import { v4 as uuidv4 } from 'uuid';
 import { User } from '../users/entities/user.entity';
 import { Request, Response } from 'express';
 import { AppGateway } from 'src/app.gateway';
+import { validate as uuidValidate } from 'uuid';
 
+interface OverlayMetadata {
+    id: string;
+    text: string;
+    x: number;
+    y: number;
+    scale: number;
+    rotation: number;
+    fontSize: number;
+    color: string;
+}
+
+interface ProcessVideoOptions {
+    inputPath: string;
+    outputPath: string;
+    trimStart?: number; // in seconds
+    trimEnd?: number; // in seconds
+    filterColor?: string; // e.g. "#FF000080" or "transparent"
+    overlays?: OverlayMetadata[];
+}
 @Injectable()
 export class VideoService {
     constructor(
@@ -45,6 +65,88 @@ export class VideoService {
         });
     }
 
+    private async processVideo(options: {
+        inputPath: string;
+        outputPath: string;
+        trimStart?: number;
+        trimEnd?: number;
+        filterColor?: string;
+        overlays?: {
+            id: string;
+            text: string;
+            x: number;
+            y: number;
+            scale: number;
+            rotation: number;
+            fontSize: number;
+            color: string;
+        }[];
+    }): Promise<void> {
+        const { inputPath, outputPath, trimStart = 0, trimEnd, filterColor, overlays = [] } = options;
+
+        return new Promise((resolve, reject) => {
+            let command = ffmpeg(inputPath);
+
+            // --- 1️⃣ Trim video safely
+            if (trimStart > 0) command = command.setStartTime(trimStart);
+            if (trimEnd && trimEnd > trimStart) command = command.setDuration(trimEnd - trimStart);
+
+            // --- 2️⃣ Build FFmpeg filters
+            const filters: any[] = [];
+
+            // Apply color filter if not transparent
+            if (filterColor && filterColor.toLowerCase() !== 'transparent') {
+                filters.push({
+                    filter: 'colorchannelmixer',
+                    options: this.hexToMixer(filterColor),
+                });
+            }
+
+            // Add text overlays
+            for (const overlay of overlays) {
+                const safeText = overlay.text.replace(/:/g, '\\:').replace(/'/g, "\\'");
+                filters.push({
+                    filter: 'drawtext',
+                    options: {
+                        text: safeText,
+                        x: overlay.x,
+                        y: overlay.y,
+                        fontsize: overlay.fontSize,
+                        fontcolor: overlay.color,
+                        angle: overlay.rotation,
+                    },
+                });
+            }
+
+            if (filters.length > 0) command = command.videoFilters(filters);
+
+            // --- 3️⃣ Encode and save
+            command
+                .outputOptions('-preset veryfast')
+                .save(outputPath)
+                .on('start', cmd => console.log('🎬 FFmpeg command:', cmd))
+                .on('end', () => {
+                    console.log('✅ Video processed:', outputPath);
+                    resolve();
+                })
+                .on('error', err => {
+                    console.error('❌ Error processing video:', err.message);
+                    reject(err);
+                });
+
+        });
+    }
+
+    // Helper to convert a hex color like "#FF000080" to FFmpeg colorchannelmixer options
+    private hexToMixer(hex: string): string {
+        const c = hex.replace('#', '');
+        const r = parseInt(c.substring(0, 2), 16) / 255;
+        const g = parseInt(c.substring(2, 4), 16) / 255;
+        const b = parseInt(c.substring(4, 6), 16) / 255;
+        const a = c.length === 8 ? parseInt(c.substring(6, 8), 16) / 255 : 0.4;
+        return `rr=${r}:gg=${g}:bb=${b}:aa=${a}`;
+    }
+
     async create(createVideoDto: CreateVideoDto, filename: string, userId: string) {
         const user = await this.userRepository.findOne({ where: { id: userId } });
 
@@ -54,17 +156,17 @@ export class VideoService {
 
         // ---------------- AUDIO HANDLING ----------------
         let audio: Audio | null = null;
-        if (createVideoDto.audioId) {
+        if (createVideoDto.music && uuidValidate(createVideoDto.music.id)) {
             try {
                 audio = await this.audioRepository.findOneOrFail({
-                    where: { uuid: createVideoDto.audioId },
+                    where: { uuid: createVideoDto.music.id },
                 });
             } catch (err) {
                 console.warn('AudioId invalid or not found. Attempting to extract from video...');
             }
         }
 
-        if (!audio) {
+        if (!audio && createVideoDto.music) {
             const videoPath = path.join(process.cwd(), 'src', 'uploads', 'videos', filename);
             const audioFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.mp3`;
             const audioPath = path.join(process.cwd(), 'src', 'uploads', 'audios', audioFilename);
@@ -120,10 +222,36 @@ export class VideoService {
             }
 
         }
+        let externalAudioSrc = '';
+        if (createVideoDto.music && !uuidValidate(createVideoDto.music.id)) {
+            externalAudioSrc = createVideoDto.music.uri || '';
+        }
+
+        const videoPath = path.join(process.cwd(), 'src', 'uploads', 'videos', filename);
+        // --- PROCESS VIDEO BEFORE SAVING ---
+        const processedFilename = `processed-${Date.now()}-${filename}`;
+        const processedPath = path.join(process.cwd(), 'src', 'uploads', 'videos', processedFilename);
+
+        await this.processVideo({
+            inputPath: videoPath,
+            outputPath: processedPath,
+            trimStart: Number(createVideoDto.trimStart) || 0,
+            trimEnd: Number(createVideoDto.trimEnd) || 0,
+            filterColor: createVideoDto.filter || 'transparent',
+            overlays: createVideoDto.overlays || [],
+        });
+
+        // Replace original with processed version
+        // fs.unlinkSync(videoPath); // delete original if you want
+        filename = processedFilename;
 
         // ---------------- CREATE VIDEO ----------------
         const video = this.videoRepository.create({
-            ...createVideoDto,
+            title: createVideoDto.title,
+            caption: createVideoDto.caption,
+            type: createVideoDto.type || VideoType.reels,
+            externalAudioSrc: externalAudioSrc,
+            hashtags: createVideoDto.hashtags,
             user_id: user,
             audio: audio || null,
             videoUrl: `/uploads/videos/${filename}`,
@@ -142,7 +270,7 @@ export class VideoService {
                 }
             );
         }
-        
+
         return "stream uploaded succsessfully";
     }
 

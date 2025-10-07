@@ -7,7 +7,7 @@ import { CreateVideoDto } from './dto/create-video.dto';
 import { VideoService } from './stream.service'
 import { join } from 'path';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
-import { Request,Response } from 'express';
+import { Request, Response } from 'express';
 @Controller('videos')
 export class VideoController {
   constructor(private readonly videoService: VideoService) { }
@@ -27,13 +27,28 @@ export class VideoController {
   )
   async uploadVideo(
     @UploadedFile() file: Multer.File,
-    @Body() createVideoDto: CreateVideoDto,
+    @Body() body:any,
     @Req() req: Request,
   ) {
     const user = req.user as { userId?: string }
     if (!user || !user.userId) {
       throw new BadRequestException('Invalid or missing user ID in token.');
     }
+    const createVideoDto: CreateVideoDto = {
+      ...body,
+      type: body.type,
+      trimStart: body.trimStart,
+      trimEnd: body.trimEnd,
+      videoVolume: body.videoVolume,
+      filterId: body.filterId || 'transparent',
+      title: body.title || '',
+      caption: body.caption || '',
+      hashtags: body.hashtags ? (body.hashtags as string).split(' ').filter(Boolean) : undefined,
+      mentions: body.mentions ? (body.mentions as string).split(' ').filter(Boolean) : undefined,
+      music: body.music ? JSON.parse(body.music) : undefined,
+      overlays: body.overlays ? JSON.parse(body.overlays) : undefined,
+    };
+
     return this.videoService.create(createVideoDto, file.filename, user.userId);
   }
 
@@ -46,7 +61,7 @@ export class VideoController {
   ) {
     return this.videoService.streamVideo(id, req, res);
   }
-  
+
   @Get('/getAllStreamIds')
   @UseGuards(JwtAuthGuard)
   async findAll(

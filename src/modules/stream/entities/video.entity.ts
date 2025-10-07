@@ -15,9 +15,9 @@ import { View } from '../../views/entities/view.entity';
 import { IsOptional } from 'class-validator';
 
 export enum VideoType {
-  NEWS = 'news',
-  STORY = 'story',
-  REELS = 'reels',
+  news = 'news',
+  story = 'story',
+  reels = 'reels',
 }
 
 @Entity()
@@ -39,6 +39,20 @@ export class Video {
 
   @Column()
   videoUrl: string;
+
+  // @Column({ type: 'varchar', nullable: true })
+  // video_trim_from: string | null;
+
+  // @Column({ type: 'varchar', nullable: true })
+  // video_trim_to: string | null;
+
+  // @Column()
+  // @IsOptional()
+  // filter: string;
+
+  @Column({nullable: true})
+  @IsOptional()
+  externalAudioSrc: string;
 
   @ManyToOne(() => Audio, (audio) => audio.videos, { nullable: true })
   audio: Audio | null;
