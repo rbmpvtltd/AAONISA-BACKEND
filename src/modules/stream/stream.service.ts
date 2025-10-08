@@ -65,6 +65,7 @@ export class VideoService {
         });
     }
 
+
     private async processVideo(options: {
         inputPath: string;
         outputPath: string;
@@ -83,69 +84,102 @@ export class VideoService {
         }[];
     }): Promise<void> {
         const { inputPath, outputPath, trimStart = 0, trimEnd, filterColor, overlays = [] } = options;
-
+        console.log(options)
         return new Promise((resolve, reject) => {
-            let command = ffmpeg(inputPath);
+            try {
+                // Ensure output directory exists
+                fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 
-            // --- 1️⃣ Trim video safely
-            if (trimStart > 0) command = command.setStartTime(trimStart);
-            if (trimEnd && trimEnd > trimStart) command = command.setDuration(trimEnd - trimStart);
+                // Convert Windows backslashes to forward slashes
+                const safeInput = inputPath.replace(/\\/g, '/');
+                const safeOutput = outputPath.replace(/\\/g, '/');
 
-            // --- 2️⃣ Build FFmpeg filters
-            const filters: any[] = [];
+                let command = ffmpeg(safeInput);
 
-            // Apply color filter if not transparent
-            if (filterColor && filterColor.toLowerCase() !== 'transparent') {
-                filters.push({
-                    filter: 'colorchannelmixer',
-                    options: this.hexToMixer(filterColor),
-                });
+                // --- Trim video
+                if (trimStart > 0) command = command.setStartTime(trimStart);
+                if (trimEnd && trimEnd > trimStart) command = command.setDuration(trimEnd - trimStart);
+
+                // --- Build filters
+                const filters: any[] = [];
+
+                // Safe color filter
+                if (filterColor && filterColor.toLowerCase() !== 'transparent') {
+                    filters.push({
+                        filter: 'colorchannelmixer',
+                        options: this.hexToMixer(filterColor), // safe hexToMixer
+                    });
+                }
+
+                // Safe overlays
+                for (const overlay of overlays) {
+                    const safeText = overlay.text.replace(/:/g, '\\:').replace(/'/g, "\\'").replace(/#/g, '\\#');
+                    filters.push({
+                        filter: 'drawtext',
+                        options: {
+                            text: safeText,        // NO single quotes here
+                            x: Math.max(0, overlay.x),
+                            y: Math.max(0, overlay.y),
+                            fontsize: overlay.fontSize,
+                            fontcolor: overlay.color,
+                            angle: Math.round(overlay.rotation * 100) / 100, // safe 2 decimals
+                        },
+                    });
+                }
+
+
+                if (filters.length > 0) command = command.videoFilters(filters);
+
+                // --- Encode safely
+                command
+                    .outputOptions('-preset veryfast')
+                    .save(safeOutput)
+                    .on('start', cmd => console.log('🎬 FFmpeg command:', cmd))
+                    .on('end', () => {
+                        console.log('✅ Video processed:', safeOutput);
+                        resolve();
+                    })
+                    .on('error', err => {
+                        console.error('❌ Error processing video:', err.message);
+                        reject(err);
+                    });
+
+            } catch (err) {
+                reject(err);
             }
-
-            // Add text overlays
-            for (const overlay of overlays) {
-                const safeText = overlay.text.replace(/:/g, '\\:').replace(/'/g, "\\'");
-                filters.push({
-                    filter: 'drawtext',
-                    options: {
-                        text: safeText,
-                        x: overlay.x,
-                        y: overlay.y,
-                        fontsize: overlay.fontSize,
-                        fontcolor: overlay.color,
-                        angle: overlay.rotation,
-                    },
-                });
-            }
-
-            if (filters.length > 0) command = command.videoFilters(filters);
-
-            // --- 3️⃣ Encode and save
-            command
-                .outputOptions('-preset veryfast')
-                .save(outputPath)
-                .on('start', cmd => console.log('🎬 FFmpeg command:', cmd))
-                .on('end', () => {
-                    console.log('✅ Video processed:', outputPath);
-                    resolve();
-                })
-                .on('error', err => {
-                    console.error('❌ Error processing video:', err.message);
-                    reject(err);
-                });
-
         });
     }
 
-    // Helper to convert a hex color like "#FF000080" to FFmpeg colorchannelmixer options
+    // --- Safe hexToMixer for Windows FFmpeg ---
     private hexToMixer(hex: string): string {
+        if (!hex || !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(hex)) {
+            console.warn(`⚠️ Invalid hex "${hex}" — defaulting to opaque white.`);
+            return 'rr=1:gg=1:bb=1:aa=1';
+        }
+
         const c = hex.replace('#', '');
         const r = parseInt(c.substring(0, 2), 16) / 255;
         const g = parseInt(c.substring(2, 4), 16) / 255;
         const b = parseInt(c.substring(4, 6), 16) / 255;
         const a = c.length === 8 ? parseInt(c.substring(6, 8), 16) / 255 : 0.4;
-        return `rr=${r}:gg=${g}:bb=${b}:aa=${a}`;
+
+        return `rr=${r.toFixed(3)}:gg=${g.toFixed(3)}:bb=${b.toFixed(3)}:aa=${a.toFixed(3)}`;
     }
+
+    // --- Optional: Convert filter names to safe hex for FFmpeg ---
+    private filterNameToHex(filter: string): string {
+        switch (filter?.toLowerCase()) {
+            case 'warm': return '#FFA500';
+            case 'cool': return '#0000FF';
+            case 'grayscale': return '#808080';
+            case 'vintage': return '#FFC0CB';
+            case 'sepia': return '#704214';
+            case 'bright': return '#FFFFFF';
+            case 'dark': return '#000000';
+            default: return '#00000000'; // transparent fallback
+        }
+    }
+
 
     async create(createVideoDto: CreateVideoDto, filename: string, userId: string) {
         const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -229,8 +263,8 @@ export class VideoService {
 
         const videoPath = path.join(process.cwd(), 'src', 'uploads', 'videos', filename);
         // --- PROCESS VIDEO BEFORE SAVING ---
-        const processedFilename = `processed-${Date.now()}-${filename}`;
-        const processedPath = path.join(process.cwd(), 'src', 'uploads', 'videos', processedFilename);
+        const processedFilename = `${filename}`;
+        const processedPath = path.join(process.cwd(), 'src', 'uploads', 'processedVideos', processedFilename);
 
         await this.processVideo({
             inputPath: videoPath,
