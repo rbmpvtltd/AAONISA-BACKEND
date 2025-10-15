@@ -13,7 +13,7 @@ import { FollowService } from './follow.service';
 import { CreateFollowDto } from './dto/follow.dto';
 @Controller('follow')
 export class FollowController {
-  constructor(private readonly followService: FollowService) {}
+  constructor(private readonly followService: FollowService) { }
 
   @UseGuards(JwtAuthGuard)
   @Post('addfollow')
@@ -21,6 +21,8 @@ export class FollowController {
     @Body() dto: CreateFollowDto,
     @Req() req: any,
   ) {
+    console.log(' Follow endpoint hit - followerId:', req.user.userId, 'following:', dto.following);
+
     const followerId: string = req.user.userId;
     return this.followService.followUser(followerId, dto.following);
   }

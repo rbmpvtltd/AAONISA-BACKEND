@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
+import { User } from './user.entity';
 export enum StarLevel {
   'none' = 0,
   'bronze' = 1,
@@ -33,4 +34,8 @@ export class UserProfile {
 
   @Column({type:'enum', enum:StarLevel, default: StarLevel.none })
   star: StarLevel;
+
+  @OneToOne(() => User, user => user.userProfile)
+  @JoinColumn({ name: 'user_id' })
+  user: User;
 }
