@@ -4,13 +4,15 @@ import {
   Column,
   OneToMany,
   Check,
-  ManyToMany
+  ManyToMany,
+  OneToOne
 } from 'typeorm';
 import { Follow } from '../../follows/entities/follow.entity';
 import { Like } from '../../likes/entities/like.entity';
 import { View } from '../../views/entities/view.entity';
 import { Video } from '../../stream/entities/video.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
+import { UserProfile } from './user-profile.entity';
 
 export enum UserRole {
   USER = 'user',
@@ -52,6 +54,11 @@ export class User {
   resetTokenExpiry: Date | null;
 
   // ----------------- RELATIONS -----------------
+
+@OneToOne(() => UserProfile, profile => profile.user)
+  userProfile: UserProfile;  // ✅ correct property name
+
+
   @OneToMany(() => Follow, (follow) => follow.follower, { cascade: true })
   following: Follow[];
 

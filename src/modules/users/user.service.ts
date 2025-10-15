@@ -2,7 +2,7 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Multer } from 'multer'
-import { Repository } from 'typeorm';
+import { Like, Repository } from 'typeorm';
 import { Response } from 'express';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -17,6 +17,7 @@ import { AuthService } from '../auth/auth.service';
 import { OtpService } from '../otp/otp.service';
 import { EmailService } from '../otp/email.service';
 import { SmsService } from '../otp/sms.service';
+import { Follow } from '../follows/entities/follow.entity';
 const fs = require('fs');
 const path = require('path');
 @Injectable()
@@ -26,10 +27,12 @@ export class UserService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(UserProfile)
     private readonly userProfileRepository: Repository<UserProfile>,
+       @InjectRepository(Follow) // ✅ Add this line
+    private readonly followRepository: Repository<Follow>,
     private readonly authService: AuthService,
     private readonly otpService: OtpService,
     private readonly emailService: EmailService,
-    private readonly smsService: SmsService
+    private readonly smsService: SmsService,
   ) { }
 
   async preRegisterCheck(dto: { emailOrPhone: string; username: string }) {
@@ -321,6 +324,88 @@ export class UserService {
       dataUrl,
       success: true,
     };
+  }
+
+async getCurrentUser(userId: any) {
+  const user = await this.userRepository.findOneBy({ id: userId });
+  if (!user) {
+    return { success: false, message: 'User not found' };
+  }
+  return { success: true, userProfile: user };
+}
+
+async getProfileByUsername(username: string) {
+  console.log('🔍 getProfileByUsername called for:', username);
+
+  // Step 1: Get user info with profile
+  const user = await this.userRepository
+    .createQueryBuilder('user')
+    .leftJoinAndSelect('user.userProfile', 'userProfile')
+    .where('user.username = :username', { username })
+    .getOne();
+
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+
+  const userId = user.id;
+  console.log(' User found:', userId, user.username);
+
+  // Step 2: Followers (who follows this user)
+  const followers = await this.followRepository
+    .createQueryBuilder('follow')
+    .leftJoin('follow.follower', 'follower') // relation join
+    .leftJoin('follower.userProfile', 'followerProfile')
+    .select([
+      'follower.id AS id',
+      'follower.username AS username',
+      'followerProfile.name AS name',
+      'followerProfile.ProfilePicture AS ProfilePicture'
+    ])
+    .where('follow.followingId = :userId', { userId })
+    .getRawMany();
+
+  // Step 3: Followings (whom this user follows)
+  const followings = await this.followRepository
+    .createQueryBuilder('follow')
+    .leftJoin('follow.following', 'following')
+    .leftJoin('following.userProfile', 'followingProfile')
+    .select([
+      'following.id AS id',
+      'following.username AS username',
+      'followingProfile.name AS name',
+      'followingProfile.ProfilePicture AS ProfilePicture'
+    ])
+    .where('follow.followerId = :userId', { userId })
+    .getRawMany();
+
+  console.log('📊 Followers count:', followers.length);
+  console.log('📊 Followings count:', followings.length);
+
+  // Step 4: Final response
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    phone_no: user.phone_no,
+    role: user.role,
+    userProfile: user.userProfile,
+    followers,
+    followings,
+  };
+}
+
+  async searchUsers(query?: string) {
+    const users = await this.userRepository.find({
+      where: { username: Like(`%${query}%`), },
+      relations: ['userProfile']
+    });
+
+    if (!users) {
+      console.log('No users found');
+    }
+
+    return users
   }
 
   async updateEmailOtp(dto) {
