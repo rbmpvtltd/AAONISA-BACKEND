@@ -13,6 +13,8 @@ import { Request, Response } from 'express';
 import { AppGateway } from 'src/app.gateway';
 import { validate as uuidValidate } from 'uuid';
 
+const { createCanvas } = require('canvas');
+
 interface OverlayMetadata {
     id: string;
     text: string;
@@ -65,7 +67,6 @@ export class VideoService {
         });
     }
 
-
     private async processVideo(options: {
         inputPath: string;
         outputPath: string;
@@ -87,60 +88,131 @@ export class VideoService {
         console.log(options)
         return new Promise((resolve, reject) => {
             try {
-                // Ensure output directory exists
                 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-
-                // Convert Windows backslashes to forward slashes
+                overlays.push({ id: 'dummy', text: 'dummy', x: 0, y: 0, scale: 1, rotation: 0, fontSize: 72, color: 'transparent' });
                 const safeInput = inputPath.replace(/\\/g, '/');
                 const safeOutput = outputPath.replace(/\\/g, '/');
 
+                const overlayPaths: string[] = [];
+
+                const generateOverlay = (text: string, overlay: any, index: number) => {
+                    const { fontSize, color, rotation } = overlay;
+                    const tempCanvas = createCanvas(1, 1);
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.font = `${fontSize}px Arial`;
+                    const metrics = tempCtx.measureText(text);
+                    const textWidth = metrics.width;
+                    const textHeight = fontSize;
+
+                    const rad = rotation * Math.PI / 180;
+                    const rotatedWidth = Math.abs(textWidth * Math.cos(rad)) + Math.abs(textHeight * Math.sin(rad));
+                    const rotatedHeight = Math.abs(textWidth * Math.sin(rad)) + Math.abs(textHeight * Math.cos(rad));
+
+                    const canvas = createCanvas(rotatedWidth, rotatedHeight);
+                    const ctx = canvas.getContext('2d');
+                    ctx.translate(rotatedWidth / 2, rotatedHeight / 2);
+                    ctx.rotate(rad);
+                    ctx.fillStyle = color;
+                    ctx.font = `${fontSize}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(text, 0, 0);
+
+                    const overlayPath = path.join(process.cwd(), 'src', 'uploads', `overlay_${index}.png`);
+                    fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
+                    return overlayPath;
+                };
+
+                overlays.forEach((ov, i) => {
+                    const overlayPath = generateOverlay(ov.text, ov, i);
+                    overlayPaths.push(overlayPath);
+                });
+
+                // 2️⃣ Build FFmpeg command
                 let command = ffmpeg(safeInput);
+                overlayPaths.forEach(p => command.input(p));
 
-                // --- Trim video
+                // 3️⃣ Trim
+                const duration = trimEnd && trimEnd > trimStart ? trimEnd - trimStart : undefined;
                 if (trimStart > 0) command = command.setStartTime(trimStart);
-                if (trimEnd && trimEnd > trimStart) command = command.setDuration(trimEnd - trimStart);
+                if (duration) command = command.setDuration(duration);
 
-                // --- Build filters
-                const filters: any[] = [];
+                // 4️⃣ Build filter chain
+                const filterComplex: any[] = [];
+                let lastOutput = 'v0';
 
-                // Safe color filter
-                if (filterColor && filterColor.toLowerCase() !== 'transparent') {
-                    filters.push({
-                        filter: 'colorchannelmixer',
-                        options: this.hexToMixer(filterColor), // safe hexToMixer
-                    });
-                }
+                // if (filterColor && filterColor.toLowerCase() !== 'transparent') {
+                //     filterComplex.push({
+                //         filter: 'colorchannelmixer',
+                //         options: this.hexToMixer(filterColor),
+                //         outputs: 'v0'
+                //     });
+                // } else {
+                //     lastOutput = '0:v';
+                // }
 
-                // Safe overlays
-                for (const overlay of overlays) {
-                    const safeText = overlay.text.replace(/:/g, '\\:').replace(/'/g, "\\'").replace(/#/g, '\\#');
-                    filters.push({
-                        filter: 'drawtext',
+                if (filterColor && filterColor.toLowerCase() !== 'transparent' && filterColor !== '#00000000') {
+                    const colorHex = filterColor.replace('#', '');
+                    const r = parseInt(colorHex.substring(0, 2), 16);
+                    const g = parseInt(colorHex.substring(2, 4), 16);
+                    const b = parseInt(colorHex.substring(4, 6), 16);
+                    const a = colorHex.length === 8 ? parseInt(colorHex.substring(6, 8), 16) / 255 : 0.3; // Default transparency
+
+                    // Create a semi-transparent color layer matching the input video size
+                    filterComplex.push({
+                        filter: 'color',
                         options: {
-                            text: safeText,        // NO single quotes here
-                            x: Math.max(0, overlay.x),
-                            y: Math.max(0, overlay.y),
-                            fontsize: overlay.fontSize,
-                            fontcolor: overlay.color,
-                            angle: Math.round(overlay.rotation * 100) / 100, // safe 2 decimals
+                            color: `rgba(${r},${g},${b},${a})`,
+                            size: 'main_wxmain_h',   // This dynamically matches input video resolution
+                            duration: '0'            // 0 means it matches the length of the input automatically
                         },
+                        outputs: ['color_layer']
                     });
+
+                    // Overlay the color layer on the video
+                    filterComplex.push({
+                        filter: 'overlay',
+                        options: { x: 0, y: 0, shortest: 1 }, // shortest=1 ensures overlay stops when input ends
+                        inputs: ['0:v', 'color_layer'],
+                        outputs: ['v0']
+                    });
+
+                    lastOutput = 'v0';
+                } else {
+                    lastOutput = '0:v';
                 }
 
 
-                if (filters.length > 0) command = command.videoFilters(filters);
 
-                // --- Encode safely
+                overlays.forEach((ov, i) => {
+                    const inputIndex = i + 1;
+                    filterComplex.push({
+                        filter: 'overlay',
+                        options: { x: `(main_w-overlay_w)`, y: `(main_h-overlay_h)` },
+                        inputs: [lastOutput, `${inputIndex}:v`],
+                        outputs: `tmp${i}`
+                    });
+                    lastOutput = `tmp${i}`;
+                });
+
+                const finalOutput = overlays.length > 0 ? `tmp${overlays.length - 1}` : lastOutput;
+
+                // 5️⃣ Run FFmpeg
                 command
+                    .complexFilter(filterComplex, finalOutput)
                     .outputOptions('-preset veryfast')
                     .save(safeOutput)
                     .on('start', cmd => console.log('🎬 FFmpeg command:', cmd))
                     .on('end', () => {
-                        console.log('✅ Video processed:', safeOutput);
+                        console.log('✅ Video processed with overlays & trimming!');
+                        // cleanup
+                        overlayPaths.forEach(p => {
+                            if (fs.existsSync(p)) fs.unlinkSync(p);
+                        });
                         resolve();
                     })
                     .on('error', err => {
-                        console.error('❌ Error processing video:', err.message);
+                        console.error('❌ FFmpeg error:', err.message);
                         reject(err);
                     });
 
@@ -150,20 +222,102 @@ export class VideoService {
         });
     }
 
+    // private async processVideo(options: {
+    //     inputPath: string;
+    //     outputPath: string;
+    //     trimStart?: number;
+    //     trimEnd?: number;
+    //     filterColor?: string;
+    //     overlays?: {
+    //         id: string;
+    //         text: string;
+    //         x: number;
+    //         y: number;
+    //         scale: number;
+    //         rotation: number;
+    //         fontSize: number;
+    //         color: string;
+    //     }[];
+    // }): Promise<void> {
+    //     const { inputPath, outputPath, trimStart = 0, trimEnd, filterColor, overlays = [] } = options;
+    //     return new Promise((resolve, reject) => {
+    //         try {
+    //             fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+
+    //             // Convert Windows backslashes to forward slashes
+    //             const safeInput = inputPath.replace(/\\/g, '/');
+    //             const safeOutput = outputPath.replace(/\\/g, '/');
+
+    //             let command = ffmpeg(safeInput);
+
+    //             // --- Trim video
+    //             if (trimStart > 0) command = command.setStartTime(trimStart);
+    //             if (trimEnd && trimEnd > trimStart) command = command.setDuration(trimEnd - trimStart);
+
+    //             // --- Build filters
+    //             const filters: any[] = [];
+
+    //             // Safe color filter
+    //             if (filterColor && filterColor.toLowerCase() !== 'transparent') {
+    //                 filters.push({
+    //                     filter: 'colorchannelmixer',
+    //                     options: this.hexToMixer(filterColor), // safe hexToMixer
+    //                 });
+    //             }
+
+    //             // Safe overlays
+    //             for (const overlay of overlays) {
+    //                 const safeText = overlay.text.replace(/:/g, '\\:').replace(/'/g, "\\'").replace(/#/g, '\\#');
+    //                 filters.push({
+    //                     filter: 'drawtext',
+    //                     options: {
+    //                         text: safeText,        // NO single quotes here
+    //                         x: Math.max(0, overlay.x),
+    //                         y: Math.max(0, overlay.y),
+    //                         fontsize: overlay.fontSize,
+    //                         fontcolor: overlay.color,
+    //                         angle: Math.round(overlay.rotation * 100) / 100, // safe 2 decimals
+    //                     },
+    //                 });
+    //             }
+
+
+    //             if (filters.length > 0) command = command.videoFilters(filters);
+
+    //             // --- Encode safely
+    //             command
+    //                 .outputOptions('-preset veryfast')
+    //                 .save(safeOutput)
+    //                 .on('start', cmd => console.log('🎬 FFmpeg command:', cmd))
+    //                 .on('end', () => {
+    //                     console.log('✅ Video processed:', safeOutput);
+    //                     resolve();
+    //                 })
+    //                 .on('error', err => {
+    //                     console.error('❌ Error processing video:', err.message);
+    //                     reject(err);
+    //                 });
+
+    //         } catch (err) {
+    //             reject(err);
+    //         }
+    //     });
+    // }
+
     // --- Safe hexToMixer for Windows FFmpeg ---
     private hexToMixer(hex: string): string {
         if (!hex || !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(hex)) {
             console.warn(`⚠️ Invalid hex "${hex}" — defaulting to opaque white.`);
-            return 'rr=1:gg=1:bb=1:aa=1';
+            return 'rr=1:gg=1:bb=1:aa=0.2';
         }
 
         const c = hex.replace('#', '');
         const r = parseInt(c.substring(0, 2), 16) / 255;
         const g = parseInt(c.substring(2, 4), 16) / 255;
         const b = parseInt(c.substring(4, 6), 16) / 255;
-        const a = c.length === 8 ? parseInt(c.substring(6, 8), 16) / 255 : 0.4;
+        // const a = c.length === 8 ? parseInt(c.substring(6, 8), 16) / 255 : 0.2;
 
-        return `rr=${r.toFixed(3)}:gg=${g.toFixed(3)}:bb=${b.toFixed(3)}:aa=${a.toFixed(3)}`;
+        return `rr=${r.toFixed(3)}:gg=${g.toFixed(3)}:bb=${b.toFixed(3)}:aa=0.2`;
     }
 
     // --- Optional: Convert filter names to safe hex for FFmpeg ---
@@ -285,7 +439,7 @@ export class VideoService {
             caption: createVideoDto.caption,
             type: createVideoDto.type || VideoType.reels,
             externalAudioSrc: externalAudioSrc,
-            hashtags: createVideoDto.hashtags,
+            // hashtags: createVideoDto.hashtags,
             user_id: user,
             audio: audio || null,
             videoUrl: `/uploads/videos/${filename}`,

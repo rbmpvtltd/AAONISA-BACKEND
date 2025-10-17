@@ -34,8 +34,8 @@ export class Video {
   @Column({ nullable: true })
   caption: string;
 
-  @Column('simple-array')
-  hashtags: string[];
+  // @Column('simple-array')
+  // hashtags: string[];
 
   @Column()
   videoUrl: string;
