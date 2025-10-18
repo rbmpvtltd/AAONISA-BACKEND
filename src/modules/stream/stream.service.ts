@@ -67,6 +67,31 @@ export class VideoService {
         });
     }
 
+    private async compressVideoOverwrite(filePath: string): Promise<string> {
+        const compressedPath = path.join(
+            path.dirname(filePath),       // same folder
+            `compressed_${path.basename(filePath)}` // compressed_ + original name
+        );
+        return new Promise((resolve, reject) => {
+            ffmpeg(filePath)
+                .outputOptions('-y') // overwrite existing file
+                .videoCodec('libx264')
+                .size('720x1280')      // 9:16 ratio
+                .videoBitrate('3000k') // 3 Mbps
+                .fps(30)               // frame rate
+                .audioCodec('aac')     // copy audio
+                .output(compressedPath)      // overwrite same file
+                .on('end', () => {
+                    console.log('✅ Compression completed and overwritten:', compressedPath);
+                    resolve(compressedPath);
+                })
+                .on('error', (err) => {
+                    console.error('❌ Compression failed:', err);
+                    reject(err);
+                })
+                .run();
+        });
+    }
     private async processVideo(options: {
         inputPath: string;
         outputPath: string;
@@ -85,59 +110,106 @@ export class VideoService {
         }[];
     }): Promise<void> {
         const { inputPath, outputPath, trimStart = 0, trimEnd, filterColor, overlays = [] } = options;
-        console.log(options)
+        const safeInput = inputPath.replace(/\\/g, '/');
+        const safeOutput = outputPath.replace(/\\/g, '/');
+        const compressed = await this.compressVideoOverwrite(safeInput);
         return new Promise((resolve, reject) => {
             try {
                 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
                 overlays.push({ id: 'dummy', text: 'dummy', x: 0, y: 0, scale: 1, rotation: 0, fontSize: 72, color: 'transparent' });
-                const safeInput = inputPath.replace(/\\/g, '/');
-                const safeOutput = outputPath.replace(/\\/g, '/');
 
                 const overlayPaths: string[] = [];
 
-                const generateOverlay = (text: string, overlay: any, index: number) => {
+                // const generateOverlay = (text: string, overlay: any, index: number) => {
+                //     const { fontSize, color, rotation } = overlay;
+
+                //     // 1. Temporary canvas to measure text accurately
+                //     const tempCanvas = createCanvas(1, 1);
+                //     const tempCtx = tempCanvas.getContext('2d');
+                //     tempCtx.font = `${fontSize*2}px Arial`;
+
+                //     const metrics = tempCtx.measureText(text);
+                //     const textWidth = metrics.width;
+                //     const textHeight = (metrics.actualBoundingBoxAscent || fontSize) +
+                //         (metrics.actualBoundingBoxDescent || 0);
+
+                //     const rotatedWidth = Math.abs(textWidth * Math.cos(rotation)) + Math.abs(textHeight * Math.sin(rotation));
+                //     const rotatedHeight = Math.abs(textWidth * Math.sin(rotation)) + Math.abs(textHeight * Math.cos(rotation));
+
+                //     // 3. Create final canvas
+                //     const canvas = createCanvas(rotatedWidth, rotatedHeight);
+                //     const ctx = canvas.getContext('2d');
+
+                //     // 4. Translate to center and rotate
+                //     ctx.translate(rotatedWidth / 2, rotatedHeight / 2);
+                //     ctx.rotate(rotation);
+
+                //     // 5. Draw text centered
+                //     ctx.fillStyle = color;
+                //     ctx.font = `${fontSize*2}px Arial`;
+                //     ctx.textAlign = 'center';
+                //     ctx.textBaseline = 'middle';
+                //     ctx.fillText(text, 0, 0);
+
+                //     // 6. Save PNG
+                //     const overlayPath = path.join(process.cwd(), `overlay_${index}.png`);
+                //     fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
+
+                //     return overlayPath;
+                // };
+                const generateOverlay = (text: string, overlay: any, index: number): string => {
                     const { fontSize, color, rotation } = overlay;
+
+                    // 1. Temporary canvas to measure text accurately
                     const tempCanvas = createCanvas(1, 1);
                     const tempCtx = tempCanvas.getContext('2d');
-                    tempCtx.font = `${fontSize}px Arial`;
+                    tempCtx.font = `${fontSize * 2}px Arial`;
                     const metrics = tempCtx.measureText(text);
                     const textWidth = metrics.width;
-                    const textHeight = fontSize;
+                    const textHeight = (metrics.actualBoundingBoxAscent || fontSize) +
+                        (metrics.actualBoundingBoxDescent || 0);
 
-                    const rad = rotation * Math.PI / 180;
-                    const rotatedWidth = Math.abs(textWidth * Math.cos(rad)) + Math.abs(textHeight * Math.sin(rad));
-                    const rotatedHeight = Math.abs(textWidth * Math.sin(rad)) + Math.abs(textHeight * Math.cos(rad));
+                    // 2. Add extra padding for rotation
+                    const padding = 20;
+                    const rotatedWidth = Math.abs(textWidth * Math.cos(rotation)) + Math.abs(textHeight * Math.sin(rotation)) + padding;
+                    const rotatedHeight = Math.abs(textWidth * Math.sin(rotation)) + Math.abs(textHeight * Math.cos(rotation)) + padding;
 
+                    // 3. Create final canvas
                     const canvas = createCanvas(rotatedWidth, rotatedHeight);
                     const ctx = canvas.getContext('2d');
+
+                    // ✅ Enable subpixel anti-aliasing for sharp text
+                    ctx.antialias = 'subpixel';
+
+                    // 4. Translate to center and rotate
                     ctx.translate(rotatedWidth / 2, rotatedHeight / 2);
-                    ctx.rotate(rad);
+                    ctx.rotate(rotation);
+
+                    // 5. Draw text centered
                     ctx.fillStyle = color;
-                    ctx.font = `${fontSize}px Arial`;
+                    ctx.font = `${fontSize * 2}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(text, 0, 0);
 
-                    const overlayPath = path.join(process.cwd(), 'src', 'uploads', `overlay_${index}.png`);
+                    // 6. Save PNG
+                    const overlayPath = path.join(process.cwd(), `overlay_${index}.png`);
                     fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
+
                     return overlayPath;
                 };
-
                 overlays.forEach((ov, i) => {
                     const overlayPath = generateOverlay(ov.text, ov, i);
                     overlayPaths.push(overlayPath);
                 });
 
-                // 2️⃣ Build FFmpeg command
-                let command = ffmpeg(safeInput);
+                let command = ffmpeg(compressed);
                 overlayPaths.forEach(p => command.input(p));
 
-                // 3️⃣ Trim
                 const duration = trimEnd && trimEnd > trimStart ? trimEnd - trimStart : undefined;
                 if (trimStart > 0) command = command.setStartTime(trimStart);
                 if (duration) command = command.setDuration(duration);
 
-                // 4️⃣ Build filter chain
                 const filterComplex: any[] = [];
                 let lastOutput = 'v0';
 
@@ -151,30 +223,35 @@ export class VideoService {
                 //     lastOutput = '0:v';
                 // }
 
-                if (filterColor && filterColor.toLowerCase() !== 'transparent' && filterColor !== '#00000000') {
+                if (
+                    filterColor &&
+                    filterColor.toLowerCase() !== 'transparent' &&
+                    filterColor !== '#00000000'
+                ) {
                     const colorHex = filterColor.replace('#', '');
-                    const r = parseInt(colorHex.substring(0, 2), 16);
-                    const g = parseInt(colorHex.substring(2, 4), 16);
-                    const b = parseInt(colorHex.substring(4, 6), 16);
-                    const a = colorHex.length === 8 ? parseInt(colorHex.substring(6, 8), 16) / 255 : 0.3; // Default transparency
+                    const hexRGB = colorHex.substring(0, 6);
+                    const alpha = colorHex.length === 8
+                        ? (parseInt(colorHex.substring(6, 8), 16) / 255).toFixed(2)
+                        : 0.3;
 
-                    // Create a semi-transparent color layer matching the input video size
+                    const ffmpegColor = `0x${hexRGB}@${alpha}`;
+
                     filterComplex.push({
                         filter: 'color',
                         options: {
-                            color: `rgba(${r},${g},${b},${a})`,
-                            size: 'main_wxmain_h',   // This dynamically matches input video resolution
-                            duration: '0'            // 0 means it matches the length of the input automatically
+                            color: ffmpegColor,
+                            size: '720x1280',
+                            duration: '5',
                         },
-                        outputs: ['color_layer']
+                        outputs: ['color_layer'],
                     });
 
-                    // Overlay the color layer on the video
+                    // Overlay color layer on video
                     filterComplex.push({
                         filter: 'overlay',
-                        options: { x: 0, y: 0, shortest: 1 }, // shortest=1 ensures overlay stops when input ends
+                        options: { x: 0, y: 0, shortest: 1 },
                         inputs: ['0:v', 'color_layer'],
-                        outputs: ['v0']
+                        outputs: ['v0'],
                     });
 
                     lastOutput = 'v0';
@@ -184,11 +261,14 @@ export class VideoService {
 
 
 
+
+
                 overlays.forEach((ov, i) => {
                     const inputIndex = i + 1;
                     filterComplex.push({
                         filter: 'overlay',
-                        options: { x: `(main_w-overlay_w)`, y: `(main_h-overlay_h)` },
+                        options: { x: `${ov.x}`, y: `main_h - ${(ov.y)}-100` },
+                        // options: { x: `0`, y: `main_h - overlay_h` },
                         inputs: [lastOutput, `${inputIndex}:v`],
                         outputs: `tmp${i}`
                     });
@@ -197,7 +277,6 @@ export class VideoService {
 
                 const finalOutput = overlays.length > 0 ? `tmp${overlays.length - 1}` : lastOutput;
 
-                // 5️⃣ Run FFmpeg
                 command
                     .complexFilter(filterComplex, finalOutput)
                     .outputOptions('-preset veryfast')
@@ -304,35 +383,6 @@ export class VideoService {
     //     });
     // }
 
-    // --- Safe hexToMixer for Windows FFmpeg ---
-    private hexToMixer(hex: string): string {
-        if (!hex || !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(hex)) {
-            console.warn(`⚠️ Invalid hex "${hex}" — defaulting to opaque white.`);
-            return 'rr=1:gg=1:bb=1:aa=0.2';
-        }
-
-        const c = hex.replace('#', '');
-        const r = parseInt(c.substring(0, 2), 16) / 255;
-        const g = parseInt(c.substring(2, 4), 16) / 255;
-        const b = parseInt(c.substring(4, 6), 16) / 255;
-        // const a = c.length === 8 ? parseInt(c.substring(6, 8), 16) / 255 : 0.2;
-
-        return `rr=${r.toFixed(3)}:gg=${g.toFixed(3)}:bb=${b.toFixed(3)}:aa=0.2`;
-    }
-
-    // --- Optional: Convert filter names to safe hex for FFmpeg ---
-    private filterNameToHex(filter: string): string {
-        switch (filter?.toLowerCase()) {
-            case 'warm': return '#FFA500';
-            case 'cool': return '#0000FF';
-            case 'grayscale': return '#808080';
-            case 'vintage': return '#FFC0CB';
-            case 'sepia': return '#704214';
-            case 'bright': return '#FFFFFF';
-            case 'dark': return '#000000';
-            default: return '#00000000'; // transparent fallback
-        }
-    }
 
 
     async create(createVideoDto: CreateVideoDto, filename: string, userId: string) {
@@ -379,6 +429,12 @@ export class VideoService {
             }
         }
 
+        const overlayHashtags = createVideoDto.overlays
+            .filter(item => item.text.startsWith('#'))
+            .map(item => item.text);
+        const overlayMentions = createVideoDto.overlays
+            .filter(item => item.text.startsWith('@'))
+            .map(item => item.text);
         // ---------------- MENTIONS HANDLING ----------------
         let mentionedUsers: User[] = [];
         let mentionsArray: string[] = [];
@@ -479,7 +535,6 @@ export class VideoService {
         }
 
         const filePath = path.join(process.cwd(), 'src', video.videoUrl);
-        console.log(filePath)
         if (!fs.existsSync(filePath)) {
             throw new NotFoundException('File not found on server');
         }
