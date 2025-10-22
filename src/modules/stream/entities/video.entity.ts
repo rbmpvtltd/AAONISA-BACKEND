@@ -13,6 +13,7 @@ import { Audio } from './audio.entity';
 import { Like } from '../../likes/entities/like.entity';
 import { View } from '../../views/entities/view.entity';
 import { IsOptional } from 'class-validator';
+import { Hashtag } from './hashtag.entity';
 
 export enum VideoType {
   news = 'news',
@@ -34,21 +35,8 @@ export class Video {
   @Column({ nullable: true })
   caption: string;
 
-  // @Column('simple-array')
-  // hashtags: string[];
-
   @Column()
   videoUrl: string;
-
-  // @Column({ type: 'varchar', nullable: true })
-  // video_trim_from: string | null;
-
-  // @Column({ type: 'varchar', nullable: true })
-  // video_trim_to: string | null;
-
-  // @Column()
-  // @IsOptional()
-  // filter: string;
 
   @Column({nullable: true})
   @IsOptional()
@@ -85,4 +73,8 @@ export class Video {
   @ManyToMany(() => User, { cascade: false })
   @JoinTable()
   mentions: User[];
+
+   @ManyToMany(() => Hashtag, (hashtag) => hashtag.videos, { cascade: true })
+  @JoinTable()
+  hashtags: Hashtag[];
 }

@@ -4,6 +4,9 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
 import { Multer } from 'multer'
+import * as fs from 'fs';
+import * as path from 'path';
+import * as mime from 'mime-types';
 @Injectable()
 export class UploadService {
     private s3: S3Client;
@@ -26,16 +29,37 @@ export class UploadService {
      * @param category stories|news|reels|profiles
      * @param customName optional custom file name
      */
-    async uploadFile(file: Multer.File, category: string, customName?: string) {
-        const safeName = customName || `${Date.now()}-${file.originalname}`;
+    async uploadFile(
+        fileOrPath: Multer.File | string,
+        category: string,
+        customName?: string,
+    ) {
+        let body: any;
+        let mimeType: string;
+        let safeName: string;
+
+        if (typeof fileOrPath === 'string') {
+            // Local file path -> stream
+            const filePath = fileOrPath;
+            body = fs.createReadStream(filePath);
+            mimeType = mime.lookup(filePath) || 'application/octet-stream';
+            safeName = customName || `${Date.now()}-${path.basename(filePath)}`;
+        } else {
+            // Multer file -> buffer (already in memory)
+            body = fileOrPath.buffer;
+            mimeType = fileOrPath.mimetype;
+            safeName = customName || `${Date.now()}-${fileOrPath.originalname}`;
+        }
+
         const key = `${category}/${safeName}`;
         const publicUrl = `https://pub-a258ba4c9bd54cb1b6b94b53d2d61324.r2.dev/${key}`;
+
         await this.s3.send(
             new PutObjectCommand({
                 Bucket: this.bucket,
                 Key: key,
-                Body: file.buffer,
-                ContentType: file.mimetype,
+                Body: body, // <- works with both stream and buffer
+                ContentType: mimeType,
             }),
         );
 
@@ -43,11 +67,9 @@ export class UploadService {
             key,
             url: `https://${this.bucket}.r2.cloudflarestorage.com/${key}`,
             publicUrl,
-            size: file.size,
-            contentType: file.mimetype,
+            contentType: mimeType,
         };
     }
-
     /**
      * Generate a presigned URL (default 1 hour)
      */

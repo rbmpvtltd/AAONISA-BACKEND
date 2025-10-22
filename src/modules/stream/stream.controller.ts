@@ -36,15 +36,15 @@ export class VideoController {
     }
     const createVideoDto: CreateVideoDto = {
       ...body,
-      type: body.type,
+      type: body.contentType,
       trimStart: body.trimStart,
       trimEnd: body.trimEnd,
       videoVolume: body.videoVolume,
       filterId: body.filterId || 'transparent',
       title: body.title || '',
       caption: body.caption || '',
-      hashtags: body.hashtags ? (body.hashtags as string).split(' ').filter(Boolean) : undefined,
-      mentions: body.mentions ? (body.mentions as string).split(' ').filter(Boolean) : undefined,
+      hashtags: body.hashtags ? (body.hashtags as string).split(' ').filter(Boolean) : [],
+      mentions: body.mentions ? (body.mentions as string).split(' ').filter(Boolean) : [],
       music: body.music ? JSON.parse(body.music) : undefined,
       overlays: body.overlays ? JSON.parse(body.overlays) : undefined,
     };

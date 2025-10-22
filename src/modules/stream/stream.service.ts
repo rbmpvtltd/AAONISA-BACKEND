@@ -9,10 +9,11 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { User } from '../users/entities/user.entity';
+import { Hashtag } from './entities/hashtag.entity';
 import { Request, Response } from 'express';
 import { AppGateway } from 'src/app.gateway';
 import { validate as uuidValidate } from 'uuid';
-
+import { UploadService } from '../upload/upload.service';
 const { createCanvas } = require('canvas');
 
 interface OverlayMetadata {
@@ -43,8 +44,10 @@ export class VideoService {
         private readonly userRepository: Repository<User>,
         @InjectRepository(Audio)
         private readonly audioRepository: Repository<Audio>,
-
-        private readonly gateway: AppGateway
+        @InjectRepository(Hashtag)
+        private readonly hashtagRepo: Repository<Hashtag>,
+        private readonly gateway: AppGateway,
+        private readonly uploadService: UploadService
     ) { }
     private async checkIfVideoHasAudio(filePath: string): Promise<boolean> {
         return new Promise((resolve, reject) => {
@@ -112,7 +115,6 @@ export class VideoService {
         const { inputPath, outputPath, trimStart = 0, trimEnd, filterColor, overlays = [] } = options;
         const safeInput = inputPath.replace(/\\/g, '/');
         const safeOutput = outputPath.replace(/\\/g, '/');
-        const compressed = await this.compressVideoOverwrite(safeInput);
         return new Promise((resolve, reject) => {
             try {
                 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
@@ -203,7 +205,7 @@ export class VideoService {
                     overlayPaths.push(overlayPath);
                 });
 
-                let command = ffmpeg(compressed);
+                let command = ffmpeg(safeInput);
                 overlayPaths.forEach(p => command.input(p));
 
                 const duration = trimEnd && trimEnd > trimStart ? trimEnd - trimStart : undefined;
@@ -386,6 +388,7 @@ export class VideoService {
 
 
     async create(createVideoDto: CreateVideoDto, filename: string, userId: string) {
+        console.log('createVideoDto:', createVideoDto);
         const user = await this.userRepository.findOne({ where: { id: userId } });
 
         if (!user) {
@@ -435,18 +438,35 @@ export class VideoService {
         const overlayMentions = createVideoDto.overlays
             .filter(item => item.text.startsWith('@'))
             .map(item => item.text);
+
+        const normalizedTags = ([...overlayHashtags, ...createVideoDto.hashtags || []])
+            .map((tag: string) => tag.trim().toLowerCase().replace(/^#/, ''));
+
+        const existingTags = await this.hashtagRepo.find({
+            where: normalizedTags.map((tag) => ({ tag })),
+        });
+        const existingTagNames = existingTags.map((t) => t.tag);
+        const newTags = normalizedTags
+            .filter((tag) => !existingTagNames.includes(tag))
+            .map((tag) => this.hashtagRepo.create({ tag }));
+
+        const overallTags = [...new Set([...existingTags, ...newTags])];
         // ---------------- MENTIONS HANDLING ----------------
         let mentionedUsers: User[] = [];
         let mentionsArray: string[] = [];
-
-        if (createVideoDto.mentions) {
+        let tempMentionsArray: string[] = [];
+        if (createVideoDto.mentions || overlayMentions) {
             try {
                 if (typeof createVideoDto.mentions === 'string') {
-                    mentionsArray = JSON.parse(createVideoDto.mentions);
+                    tempMentionsArray = JSON.parse(createVideoDto.mentions);
                 } else if (Array.isArray(createVideoDto.mentions)) {
-                    mentionsArray = createVideoDto.mentions;
-                } else {
-                    mentionsArray = [];
+                    tempMentionsArray = createVideoDto.mentions;
+                }
+                if (Array.isArray(tempMentionsArray)) {
+                    mentionsArray = tempMentionsArray;
+                }
+                if (overlayMentions && Array.isArray(overlayMentions)) {
+                    mentionsArray = [...mentionsArray, ...overlayMentions];
                 }
             } catch (err) {
                 throw new BadRequestException('Mentions must be a valid JSON array of usernames.');
@@ -472,21 +492,31 @@ export class VideoService {
         }
 
         const videoPath = path.join(process.cwd(), 'src', 'uploads', 'videos', filename);
+        const compressed = await this.compressVideoOverwrite(videoPath);
+        const compressedPath = path.join(
+            path.dirname(videoPath),
+            `compressed_${path.basename(videoPath)}`
+        );
+        let uploadPath
         // --- PROCESS VIDEO BEFORE SAVING ---
         const processedFilename = `${filename}`;
         const processedPath = path.join(process.cwd(), 'src', 'uploads', 'processedVideos', processedFilename);
-
-        await this.processVideo({
-            inputPath: videoPath,
-            outputPath: processedPath,
-            trimStart: Number(createVideoDto.trimStart) || 0,
-            trimEnd: Number(createVideoDto.trimEnd) || 0,
-            filterColor: createVideoDto.filter || 'transparent',
-            overlays: createVideoDto.overlays || [],
-        });
+        if (createVideoDto.type === VideoType.story) {
+            await this.processVideo({
+                inputPath: compressedPath,
+                outputPath: processedPath,
+                trimStart: Number(createVideoDto.trimStart) || 0,
+                trimEnd: Number(createVideoDto.trimEnd) || 0,
+                filterColor: createVideoDto.filter || 'transparent',
+                overlays: createVideoDto.overlays || [],
+            });
+            uploadPath = await this.uploadService.uploadFile(processedPath,'stories');
+        }else{
+            uploadPath = await this.uploadService.uploadFile(compressedPath,createVideoDto.type == VideoType.reels ? 'reels' : 'news');
+        }
 
         // Replace original with processed version
-        // fs.unlinkSync(videoPath); // delete original if you want
+        fs.unlinkSync(videoPath); // delete original if you want
         filename = processedFilename;
 
         // ---------------- CREATE VIDEO ----------------
@@ -495,10 +525,10 @@ export class VideoService {
             caption: createVideoDto.caption,
             type: createVideoDto.type || VideoType.reels,
             externalAudioSrc: externalAudioSrc,
-            // hashtags: createVideoDto.hashtags,
+            hashtags: overallTags,
             user_id: user,
             audio: audio || null,
-            videoUrl: `/uploads/videos/${filename}`,
+            videoUrl: uploadPath.publicUrl,
             mentions: mentionedUsers,
         });
 
