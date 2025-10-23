@@ -11,6 +11,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { StreamModule } from './modules/stream/stream.module';
 import { FollowModule } from './modules/follows/follow.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { Bookmark } from './modules/bookmark/entities/bookmark.entity';
 import { AppGateway } from './app.gateway';
 import { ApiOAuth2 } from '@nestjs/swagger';
 @Module({
@@ -33,7 +34,8 @@ import { ApiOAuth2 } from '@nestjs/swagger';
     LikeModule,
     ViewModule,
     ShareModule,
-    UploadModule
+    UploadModule,
+    TypeOrmModule.forFeature([Bookmark]),
   ],
   controllers: [],
   providers: [AppGateway],
