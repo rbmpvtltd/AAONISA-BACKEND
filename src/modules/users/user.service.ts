@@ -326,8 +326,14 @@ export class UserService {
     };
   }
 
-async getCurrentUser(userId: any) {
-  const user = await this.userRepository.findOneBy({ id: userId });
+async getCurrentUser(userId: string) {
+  // const user = await this.userRepository.findOneBy({ id: userId }) ;
+
+    const user = await this.userRepository.findOne({
+    where: { id: userId },
+    relations: ['userProfile'], 
+  });
+
   if (!user) {
     return { success: false, message: 'User not found' };
   }
