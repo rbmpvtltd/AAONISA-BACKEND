@@ -1,6 +1,10 @@
 import {
   Body, Controller, Post, Req, Res, UseGuards, UseInterceptors,
   UploadedFile,
+  Get,
+  Param,
+  NotFoundException,
+  Query,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, PreRegisterDto } from './dto/create-user.dto';
@@ -97,11 +101,35 @@ export class UserController {
 
 
   @UseGuards(JwtAuthGuard)
+  @Get('profile/current')
+  async getCurrentUser(@Req() req) {
+    // const userId = req.user?.id;
+    const payload = req.user;   
+    const userId = payload?.sub || payload?.id || payload?.userId;
+    return this.userService.getCurrentUser(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('profile/:username')
+  async getProfileByUsername(@Param('username') username: string) {
+    return this.userService.getProfileByUsername(username);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('search')
+  async searchUsers(@Query('q') query: string) {
+    const users = await this.userService.searchUsers(query);
+    return users;
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('update-user-email')
   updateUserEmail(@Req() req, @Body() dto: UpdateUserEmail) {
     const payload = req.user
     return this.userService.updateUserEmail(dto, payload);
   }
+
+
 
   @UseGuards(JwtAuthGuard)
   @Post('update-user-phone')
