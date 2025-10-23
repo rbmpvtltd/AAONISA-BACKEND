@@ -6,9 +6,7 @@ export class CreateBookmarkDto {
   @IsString()
   name: string;
 
-  // Optional: list of reel IDs to link
   @IsOptional()
-  @IsArray()
-  @ArrayNotEmpty()
-  reelIds?: number[];
+  @IsString()
+  reelId?: string;
 }
