@@ -12,6 +12,7 @@ import { Like } from '../../likes/entities/like.entity';
 import { View } from '../../views/entities/view.entity';
 import { Video } from '../../stream/entities/video.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
+import { Bookmark } from 'src/modules/bookmark/entities/bookmark.entity';
 import { UserProfile } from './user-profile.entity';
 
 export enum UserRole {
@@ -83,4 +84,8 @@ export class User {
   // jo user ko mili
   @OneToMany(() => Notification, (notification) => notification.recipient)
   notificationsReceived: Notification[];
+
+  @OneToMany(() => Bookmark, (bookmark) => bookmark.user)
+  bookmarks: Bookmark[];
+
 }
