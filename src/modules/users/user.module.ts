@@ -12,6 +12,7 @@ import { Like } from '../likes/entities/like.entity';
 import { View } from '../views/entities/view.entity'; 
 import { Follow } from '../follows/entities/follow.entity'; 
 import { NotificationModule } from '../notifications/notification.module';
+import { UploadService } from '../upload/upload.service';
 @Module({
   imports: [TypeOrmModule.forFeature([UserProfile,User,Video,Like,View,Follow]),
   AuthModule,
@@ -19,7 +20,7 @@ import { NotificationModule } from '../notifications/notification.module';
   OtpModule,
   forwardRef(() => NotificationModule),
 ],
-  providers: [UserService],
+  providers: [UserService,UploadService],
   controllers: [UserController],
   exports: [UserService]
 })

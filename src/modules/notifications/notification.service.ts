@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { Notification, NotificationType } from './entities/notification.entity';
 import { User } from '../users/entities/user.entity';
 import { UserProfile } from '../users/entities/user-profile.entity';
+import { UploadService } from '../upload/upload.service';
 import { join } from 'path';
 import { readFile } from 'fs/promises';
 import { lookup } from 'mime-types';
@@ -36,6 +37,8 @@ export class NotificationService {
 
         @InjectRepository(UserProfile)
         private readonly userProfileRepository: Repository<UserProfile>,
+
+        private readonly uploadService: UploadService
     ) { }
 
     // Create notification
@@ -66,32 +69,38 @@ export class NotificationService {
     async getUserNotifications(payload: any): Promise<any[]> {
         const userId = payload.userId || payload.id || payload.sub;
 
-        // Fetch notifications
         const notifications = await this.notificationRepo.find({
             where: { recipient: { id: userId } },
-            relations: ['sender'], // we only need the sender relation to fetch ID
+            relations: ['sender'],
             order: { createdAt: 'DESC' },
         });
 
-        // Map notifications to include only sender id, name, and profile picture Base64
+        const toSignedUrl = async (path: string | null): Promise<string | null> => {
+            if (!path) return null;
+            const key = path.split('/').pop();
+            if (!key) return null;
+            const bucket = 'profiles';
+            const fullKey = `${bucket}/${key}`;
+            try {
+                return await this.uploadService.getFileUrl(fullKey, 3600); // 1 hour expiry
+            } catch (err) {
+                console.error('Failed to generate signed URL:', err);
+                return null;
+            }
+        };
+
         const result = await Promise.all(
             notifications.map(async (n) => {
-                let senderInfo: { id: string; name: string; imageBase64?: string } | undefined = undefined;
+                let senderInfo: { id: string; name: string; profilePicture?: string } | undefined = undefined;
 
                 if (n.sender) {
                     const profile = await this.userProfileRepository.findOneBy({ user_id: n.sender.id });
-                    let imageBase64: string | null = null;
-
-                    if (profile?.ProfilePicture) {
-                        const filename = profile.ProfilePicture.split('/').pop() || '';
-                        const filePath = join(process.cwd(), 'src', 'uploads', 'profiles', filename);
-                        imageBase64 = await getThumbnailBase64(filePath, 50, 50);
-                    }
+                    const profilePictureSignedUrl = await toSignedUrl(profile?.ProfilePicture || null);
 
                     senderInfo = {
                         id: n.sender.id,
                         name: profile?.name || n.sender.username || 'Unknown User',
-                        imageBase64: imageBase64 || '',
+                        profilePicture: profilePictureSignedUrl || '',
                     };
                 }
 
@@ -110,6 +119,7 @@ export class NotificationService {
 
         return result;
     }
+
 
     // Mark notification as read
     async markAsRead(notificationId: string): Promise<Notification> {

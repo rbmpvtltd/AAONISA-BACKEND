@@ -89,36 +89,16 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Post('update-profile')
-  @UseInterceptors(FileInterceptor('ProfilePicture', {
-    storage: diskStorage({
-      destination: (req, file, cb) => {
-        const uploadPath = path.join('src', 'uploads', 'profiles');
-        cb(null, uploadPath);
-      },
-      filename: (req, file, cb) => {
-        const userId = req.user?.sub || req.user?.id || req.user?.userId;
-        const fileExtName = extname(file.originalname);
-        const fileName = `${userId}${fileExtName}`;
-        cb(null, fileName);
-      },
-    }),
-    fileFilter: (req, file, cb) => {
-      if (!file.mimetype.match(/\/(jpg|jpeg|png)$/)) {
-        cb(new Error('Only image files are allowed!'), false);
-      } else {
-        cb(null, true);
-      }
-    },
-    limits: { fileSize: 5 * 1024 * 1024 },
-  }))
+  @UseInterceptors(FileInterceptor('ProfilePicture'))
   async updateProfile(
     @Req() req,
     @Body() dto: UpdateUserProfileDto,
-    @UploadedFile() file: Multer.File
+    @UploadedFile() file: Multer.File,
   ) {
     const payload = req.user;
     return this.userService.updateProfile(dto, payload, file);
   }
+
 
   @UseGuards(JwtAuthGuard)
   @Get('profile/current')

@@ -6,10 +6,12 @@ import { VideoService } from './stream.service';
 import { VideoController } from './stream.controller';
 import { User } from '../users/entities/user.entity';
 import { UserProfileModule } from '../users/user.module';
+import { Hashtag } from './entities/hashtag.entity';
 import { AppGateway } from 'src/app.gateway';
+import { UploadService } from '../upload/upload.service';
 @Module({
-  imports: [TypeOrmModule.forFeature([Video, Audio,User]),UserProfileModule],
+  imports: [TypeOrmModule.forFeature([Video, Audio,User,Hashtag]),UserProfileModule],
   controllers: [VideoController],
-  providers: [VideoService,AppGateway],
+  providers: [VideoService,AppGateway,UploadService],
 })
 export class StreamModule {}

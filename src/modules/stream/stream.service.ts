@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { Video } from './entities/video.entity';
+import { Video, VideoType } from './entities/video.entity';
 import { Audio } from './entities/audio.entity';
 import { CreateVideoDto } from './dto/create-video.dto';
 import * as ffmpeg from 'fluent-ffmpeg';
@@ -9,9 +9,32 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { User } from '../users/entities/user.entity';
+import { Hashtag } from './entities/hashtag.entity';
 import { Request, Response } from 'express';
 import { AppGateway } from 'src/app.gateway';
+import { validate as uuidValidate } from 'uuid';
+import { UploadService } from '../upload/upload.service';
+const { createCanvas } = require('canvas');
 
+interface OverlayMetadata {
+    id: string;
+    text: string;
+    x: number;
+    y: number;
+    scale: number;
+    rotation: number;
+    fontSize: number;
+    color: string;
+}
+
+interface ProcessVideoOptions {
+    inputPath: string;
+    outputPath: string;
+    trimStart?: number; // in seconds
+    trimEnd?: number; // in seconds
+    filterColor?: string; // e.g. "#FF000080" or "transparent"
+    overlays?: OverlayMetadata[];
+}
 @Injectable()
 export class VideoService {
     constructor(
@@ -21,8 +44,10 @@ export class VideoService {
         private readonly userRepository: Repository<User>,
         @InjectRepository(Audio)
         private readonly audioRepository: Repository<Audio>,
-
-        private readonly gateway: AppGateway
+        @InjectRepository(Hashtag)
+        private readonly hashtagRepo: Repository<Hashtag>,
+        private readonly gateway: AppGateway,
+        private readonly uploadService: UploadService
     ) { }
     private async checkIfVideoHasAudio(filePath: string): Promise<boolean> {
         return new Promise((resolve, reject) => {
@@ -45,7 +70,325 @@ export class VideoService {
         });
     }
 
+    private async compressVideoOverwrite(filePath: string): Promise<string> {
+        const compressedPath = path.join(
+            path.dirname(filePath),       // same folder
+            `compressed_${path.basename(filePath)}` // compressed_ + original name
+        );
+        return new Promise((resolve, reject) => {
+            ffmpeg(filePath)
+                .outputOptions('-y') // overwrite existing file
+                .videoCodec('libx264')
+                .size('720x1280')      // 9:16 ratio
+                .videoBitrate('3000k') // 3 Mbps
+                .fps(30)               // frame rate
+                .audioCodec('aac')     // copy audio
+                .output(compressedPath)      // overwrite same file
+                .on('end', () => {
+                    console.log('✅ Compression completed and overwritten:', compressedPath);
+                    resolve(compressedPath);
+                })
+                .on('error', (err) => {
+                    console.error('❌ Compression failed:', err);
+                    reject(err);
+                })
+                .run();
+        });
+    }
+    private async processVideo(options: {
+        inputPath: string;
+        outputPath: string;
+        trimStart?: number;
+        trimEnd?: number;
+        filterColor?: string;
+        overlays?: {
+            id: string;
+            text: string;
+            x: number;
+            y: number;
+            scale: number;
+            rotation: number;
+            fontSize: number;
+            color: string;
+        }[];
+    }): Promise<void> {
+        const { inputPath, outputPath, trimStart = 0, trimEnd, filterColor, overlays = [] } = options;
+        const safeInput = inputPath.replace(/\\/g, '/');
+        const safeOutput = outputPath.replace(/\\/g, '/');
+        return new Promise((resolve, reject) => {
+            try {
+                fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+                overlays.push({ id: 'dummy', text: 'dummy', x: 0, y: 0, scale: 1, rotation: 0, fontSize: 72, color: 'transparent' });
+
+                const overlayPaths: string[] = [];
+
+                // const generateOverlay = (text: string, overlay: any, index: number) => {
+                //     const { fontSize, color, rotation } = overlay;
+
+                //     // 1. Temporary canvas to measure text accurately
+                //     const tempCanvas = createCanvas(1, 1);
+                //     const tempCtx = tempCanvas.getContext('2d');
+                //     tempCtx.font = `${fontSize*2}px Arial`;
+
+                //     const metrics = tempCtx.measureText(text);
+                //     const textWidth = metrics.width;
+                //     const textHeight = (metrics.actualBoundingBoxAscent || fontSize) +
+                //         (metrics.actualBoundingBoxDescent || 0);
+
+                //     const rotatedWidth = Math.abs(textWidth * Math.cos(rotation)) + Math.abs(textHeight * Math.sin(rotation));
+                //     const rotatedHeight = Math.abs(textWidth * Math.sin(rotation)) + Math.abs(textHeight * Math.cos(rotation));
+
+                //     // 3. Create final canvas
+                //     const canvas = createCanvas(rotatedWidth, rotatedHeight);
+                //     const ctx = canvas.getContext('2d');
+
+                //     // 4. Translate to center and rotate
+                //     ctx.translate(rotatedWidth / 2, rotatedHeight / 2);
+                //     ctx.rotate(rotation);
+
+                //     // 5. Draw text centered
+                //     ctx.fillStyle = color;
+                //     ctx.font = `${fontSize*2}px Arial`;
+                //     ctx.textAlign = 'center';
+                //     ctx.textBaseline = 'middle';
+                //     ctx.fillText(text, 0, 0);
+
+                //     // 6. Save PNG
+                //     const overlayPath = path.join(process.cwd(), `overlay_${index}.png`);
+                //     fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
+
+                //     return overlayPath;
+                // };
+                const generateOverlay = (text: string, overlay: any, index: number): string => {
+                    const { fontSize, color, rotation } = overlay;
+
+                    // 1. Temporary canvas to measure text accurately
+                    const tempCanvas = createCanvas(1, 1);
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.font = `${fontSize * 2}px Arial`;
+                    const metrics = tempCtx.measureText(text);
+                    const textWidth = metrics.width;
+                    const textHeight = (metrics.actualBoundingBoxAscent || fontSize) +
+                        (metrics.actualBoundingBoxDescent || 0);
+
+                    // 2. Add extra padding for rotation
+                    const padding = 20;
+                    const rotatedWidth = Math.abs(textWidth * Math.cos(rotation)) + Math.abs(textHeight * Math.sin(rotation)) + padding;
+                    const rotatedHeight = Math.abs(textWidth * Math.sin(rotation)) + Math.abs(textHeight * Math.cos(rotation)) + padding;
+
+                    // 3. Create final canvas
+                    const canvas = createCanvas(rotatedWidth, rotatedHeight);
+                    const ctx = canvas.getContext('2d');
+
+                    // ✅ Enable subpixel anti-aliasing for sharp text
+                    ctx.antialias = 'subpixel';
+
+                    // 4. Translate to center and rotate
+                    ctx.translate(rotatedWidth / 2, rotatedHeight / 2);
+                    ctx.rotate(rotation);
+
+                    // 5. Draw text centered
+                    ctx.fillStyle = color;
+                    ctx.font = `${fontSize * 2}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(text, 0, 0);
+
+                    // 6. Save PNG
+                    const overlayPath = path.join(process.cwd(), `overlay_${index}.png`);
+                    fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
+
+                    return overlayPath;
+                };
+                overlays.forEach((ov, i) => {
+                    const overlayPath = generateOverlay(ov.text, ov, i);
+                    overlayPaths.push(overlayPath);
+                });
+
+                let command = ffmpeg(safeInput);
+                overlayPaths.forEach(p => command.input(p));
+
+                const duration = trimEnd && trimEnd > trimStart ? trimEnd - trimStart : undefined;
+                if (trimStart > 0) command = command.setStartTime(trimStart);
+                if (duration) command = command.setDuration(duration);
+
+                const filterComplex: any[] = [];
+                let lastOutput = 'v0';
+
+                // if (filterColor && filterColor.toLowerCase() !== 'transparent') {
+                //     filterComplex.push({
+                //         filter: 'colorchannelmixer',
+                //         options: this.hexToMixer(filterColor),
+                //         outputs: 'v0'
+                //     });
+                // } else {
+                //     lastOutput = '0:v';
+                // }
+
+                if (
+                    filterColor &&
+                    filterColor.toLowerCase() !== 'transparent' &&
+                    filterColor !== '#00000000'
+                ) {
+                    const colorHex = filterColor.replace('#', '');
+                    const hexRGB = colorHex.substring(0, 6);
+                    const alpha = colorHex.length === 8
+                        ? (parseInt(colorHex.substring(6, 8), 16) / 255).toFixed(2)
+                        : 0.3;
+
+                    const ffmpegColor = `0x${hexRGB}@${alpha}`;
+
+                    filterComplex.push({
+                        filter: 'color',
+                        options: {
+                            color: ffmpegColor,
+                            size: '720x1280',
+                            duration: '5',
+                        },
+                        outputs: ['color_layer'],
+                    });
+
+                    // Overlay color layer on video
+                    filterComplex.push({
+                        filter: 'overlay',
+                        options: { x: 0, y: 0, shortest: 1 },
+                        inputs: ['0:v', 'color_layer'],
+                        outputs: ['v0'],
+                    });
+
+                    lastOutput = 'v0';
+                } else {
+                    lastOutput = '0:v';
+                }
+
+
+
+
+
+                overlays.forEach((ov, i) => {
+                    const inputIndex = i + 1;
+                    filterComplex.push({
+                        filter: 'overlay',
+                        options: { x: `${ov.x}`, y: `main_h - ${(ov.y)}-100` },
+                        // options: { x: `0`, y: `main_h - overlay_h` },
+                        inputs: [lastOutput, `${inputIndex}:v`],
+                        outputs: `tmp${i}`
+                    });
+                    lastOutput = `tmp${i}`;
+                });
+
+                const finalOutput = overlays.length > 0 ? `tmp${overlays.length - 1}` : lastOutput;
+
+                command
+                    .complexFilter(filterComplex, finalOutput)
+                    .outputOptions('-preset veryfast')
+                    .save(safeOutput)
+                    .on('start', cmd => console.log('🎬 FFmpeg command:', cmd))
+                    .on('end', () => {
+                        console.log('✅ Video processed with overlays & trimming!');
+                        // cleanup
+                        overlayPaths.forEach(p => {
+                            if (fs.existsSync(p)) fs.unlinkSync(p);
+                        });
+                        resolve();
+                    })
+                    .on('error', err => {
+                        console.error('❌ FFmpeg error:', err.message);
+                        reject(err);
+                    });
+
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+
+    // private async processVideo(options: {
+    //     inputPath: string;
+    //     outputPath: string;
+    //     trimStart?: number;
+    //     trimEnd?: number;
+    //     filterColor?: string;
+    //     overlays?: {
+    //         id: string;
+    //         text: string;
+    //         x: number;
+    //         y: number;
+    //         scale: number;
+    //         rotation: number;
+    //         fontSize: number;
+    //         color: string;
+    //     }[];
+    // }): Promise<void> {
+    //     const { inputPath, outputPath, trimStart = 0, trimEnd, filterColor, overlays = [] } = options;
+    //     return new Promise((resolve, reject) => {
+    //         try {
+    //             fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+
+    //             // Convert Windows backslashes to forward slashes
+    //             const safeInput = inputPath.replace(/\\/g, '/');
+    //             const safeOutput = outputPath.replace(/\\/g, '/');
+
+    //             let command = ffmpeg(safeInput);
+
+    //             // --- Trim video
+    //             if (trimStart > 0) command = command.setStartTime(trimStart);
+    //             if (trimEnd && trimEnd > trimStart) command = command.setDuration(trimEnd - trimStart);
+
+    //             // --- Build filters
+    //             const filters: any[] = [];
+
+    //             // Safe color filter
+    //             if (filterColor && filterColor.toLowerCase() !== 'transparent') {
+    //                 filters.push({
+    //                     filter: 'colorchannelmixer',
+    //                     options: this.hexToMixer(filterColor), // safe hexToMixer
+    //                 });
+    //             }
+
+    //             // Safe overlays
+    //             for (const overlay of overlays) {
+    //                 const safeText = overlay.text.replace(/:/g, '\\:').replace(/'/g, "\\'").replace(/#/g, '\\#');
+    //                 filters.push({
+    //                     filter: 'drawtext',
+    //                     options: {
+    //                         text: safeText,        // NO single quotes here
+    //                         x: Math.max(0, overlay.x),
+    //                         y: Math.max(0, overlay.y),
+    //                         fontsize: overlay.fontSize,
+    //                         fontcolor: overlay.color,
+    //                         angle: Math.round(overlay.rotation * 100) / 100, // safe 2 decimals
+    //                     },
+    //                 });
+    //             }
+
+
+    //             if (filters.length > 0) command = command.videoFilters(filters);
+
+    //             // --- Encode safely
+    //             command
+    //                 .outputOptions('-preset veryfast')
+    //                 .save(safeOutput)
+    //                 .on('start', cmd => console.log('🎬 FFmpeg command:', cmd))
+    //                 .on('end', () => {
+    //                     console.log('✅ Video processed:', safeOutput);
+    //                     resolve();
+    //                 })
+    //                 .on('error', err => {
+    //                     console.error('❌ Error processing video:', err.message);
+    //                     reject(err);
+    //                 });
+
+    //         } catch (err) {
+    //             reject(err);
+    //         }
+    //     });
+    // }
+
+
+
     async create(createVideoDto: CreateVideoDto, filename: string, userId: string) {
+        console.log('createVideoDto:', createVideoDto);
         const user = await this.userRepository.findOne({ where: { id: userId } });
 
         if (!user) {
@@ -54,17 +397,17 @@ export class VideoService {
 
         // ---------------- AUDIO HANDLING ----------------
         let audio: Audio | null = null;
-        if (createVideoDto.audioId) {
+        if (createVideoDto.music && uuidValidate(createVideoDto.music.id)) {
             try {
                 audio = await this.audioRepository.findOneOrFail({
-                    where: { uuid: createVideoDto.audioId },
+                    where: { uuid: createVideoDto.music.id },
                 });
             } catch (err) {
                 console.warn('AudioId invalid or not found. Attempting to extract from video...');
             }
         }
 
-        if (!audio) {
+        if (!audio && createVideoDto.music) {
             const videoPath = path.join(process.cwd(), 'src', 'uploads', 'videos', filename);
             const audioFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.mp3`;
             const audioPath = path.join(process.cwd(), 'src', 'uploads', 'audios', audioFilename);
@@ -89,18 +432,41 @@ export class VideoService {
             }
         }
 
+        const overlayHashtags = createVideoDto.overlays
+            .filter(item => item.text.startsWith('#'))
+            .map(item => item.text);
+        const overlayMentions = createVideoDto.overlays
+            .filter(item => item.text.startsWith('@'))
+            .map(item => item.text);
+
+        const normalizedTags = ([...overlayHashtags, ...createVideoDto.hashtags || []])
+            .map((tag: string) => tag.trim().toLowerCase().replace(/^#/, ''));
+
+        const existingTags = await this.hashtagRepo.find({
+            where: normalizedTags.map((tag) => ({ tag })),
+        });
+        const existingTagNames = existingTags.map((t) => t.tag);
+        const newTags = normalizedTags
+            .filter((tag) => !existingTagNames.includes(tag))
+            .map((tag) => this.hashtagRepo.create({ tag }));
+
+        const overallTags = [...new Set([...existingTags, ...newTags])];
         // ---------------- MENTIONS HANDLING ----------------
         let mentionedUsers: User[] = [];
         let mentionsArray: string[] = [];
-
-        if (createVideoDto.mentions) {
+        let tempMentionsArray: string[] = [];
+        if (createVideoDto.mentions || overlayMentions) {
             try {
                 if (typeof createVideoDto.mentions === 'string') {
-                    mentionsArray = JSON.parse(createVideoDto.mentions);
+                    tempMentionsArray = JSON.parse(createVideoDto.mentions);
                 } else if (Array.isArray(createVideoDto.mentions)) {
-                    mentionsArray = createVideoDto.mentions;
-                } else {
-                    mentionsArray = [];
+                    tempMentionsArray = createVideoDto.mentions;
+                }
+                if (Array.isArray(tempMentionsArray)) {
+                    mentionsArray = tempMentionsArray;
+                }
+                if (overlayMentions && Array.isArray(overlayMentions)) {
+                    mentionsArray = [...mentionsArray, ...overlayMentions];
                 }
             } catch (err) {
                 throw new BadRequestException('Mentions must be a valid JSON array of usernames.');
@@ -120,13 +486,49 @@ export class VideoService {
             }
 
         }
+        let externalAudioSrc = '';
+        if (createVideoDto.music && !uuidValidate(createVideoDto.music.id)) {
+            externalAudioSrc = createVideoDto.music.uri || '';
+        }
+
+        const videoPath = path.join(process.cwd(), 'src', 'uploads', 'videos', filename);
+        const compressed = await this.compressVideoOverwrite(videoPath);
+        const compressedPath = path.join(
+            path.dirname(videoPath),
+            `compressed_${path.basename(videoPath)}`
+        );
+        let uploadPath
+        // --- PROCESS VIDEO BEFORE SAVING ---
+        const processedFilename = `${filename}`;
+        const processedPath = path.join(process.cwd(), 'src', 'uploads', 'processedVideos', processedFilename);
+        if (createVideoDto.type === VideoType.story) {
+            await this.processVideo({
+                inputPath: compressedPath,
+                outputPath: processedPath,
+                trimStart: Number(createVideoDto.trimStart) || 0,
+                trimEnd: Number(createVideoDto.trimEnd) || 0,
+                filterColor: createVideoDto.filter || 'transparent',
+                overlays: createVideoDto.overlays || [],
+            });
+            uploadPath = await this.uploadService.uploadFile(processedPath,'stories');
+        }else{
+            uploadPath = await this.uploadService.uploadFile(compressedPath,createVideoDto.type == VideoType.reels ? 'reels' : 'news');
+        }
+
+        // Replace original with processed version
+        fs.unlinkSync(videoPath); // delete original if you want
+        filename = processedFilename;
 
         // ---------------- CREATE VIDEO ----------------
         const video = this.videoRepository.create({
-            ...createVideoDto,
+            title: createVideoDto.title,
+            caption: createVideoDto.caption,
+            type: createVideoDto.type || VideoType.reels,
+            externalAudioSrc: externalAudioSrc,
+            hashtags: overallTags,
             user_id: user,
             audio: audio || null,
-            videoUrl: `/uploads/videos/${filename}`,
+            videoUrl: uploadPath.publicUrl,
             mentions: mentionedUsers,
         });
 
@@ -142,7 +544,7 @@ export class VideoService {
                 }
             );
         }
-        
+
         return "stream uploaded succsessfully";
     }
 
@@ -163,7 +565,6 @@ export class VideoService {
         }
 
         const filePath = path.join(process.cwd(), 'src', video.videoUrl);
-        console.log(filePath)
         if (!fs.existsSync(filePath)) {
             throw new NotFoundException('File not found on server');
         }

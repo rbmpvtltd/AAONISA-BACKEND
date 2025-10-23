@@ -13,11 +13,12 @@ import { Audio } from './audio.entity';
 import { Like } from '../../likes/entities/like.entity';
 import { View } from '../../views/entities/view.entity';
 import { IsOptional } from 'class-validator';
+import { Hashtag } from './hashtag.entity';
 
 export enum VideoType {
-  NEWS = 'news',
-  STORY = 'story',
-  REELS = 'reels',
+  news = 'news',
+  story = 'story',
+  reels = 'reels',
 }
 
 @Entity()
@@ -34,11 +35,12 @@ export class Video {
   @Column({ nullable: true })
   caption: string;
 
-  @Column('simple-array')
-  hashtags: string[];
-
   @Column()
   videoUrl: string;
+
+  @Column({nullable: true})
+  @IsOptional()
+  externalAudioSrc: string;
 
   @ManyToOne(() => Audio, (audio) => audio.videos, { nullable: true })
   audio: Audio | null;
@@ -71,4 +73,8 @@ export class Video {
   @ManyToMany(() => User, { cascade: false })
   @JoinTable()
   mentions: User[];
+
+   @ManyToMany(() => Hashtag, (hashtag) => hashtag.videos, { cascade: true })
+  @JoinTable()
+  hashtags: Hashtag[];
 }
