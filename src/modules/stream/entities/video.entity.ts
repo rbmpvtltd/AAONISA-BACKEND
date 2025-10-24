@@ -15,6 +15,7 @@ import { View } from '../../views/entities/view.entity';
 import { IsOptional } from 'class-validator';
 import { Hashtag } from './hashtag.entity';
 import { Bookmark } from 'src/modules/bookmark/entities/bookmark.entity';
+import { Comment } from 'src/modules/comments/entities/comment.entity';
 
 export enum VideoType {
   news = 'news',
@@ -82,4 +83,10 @@ export class Video {
   @ManyToMany(() => Bookmark, (bookmark) => bookmark.reels)
   bookmarks: Bookmark[];
 
+  
+  @OneToMany(() => Comment, (comment) => comment.reel, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
+  comments: Comment[];
 }

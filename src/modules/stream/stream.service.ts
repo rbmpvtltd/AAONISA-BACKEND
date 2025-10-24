@@ -486,6 +486,7 @@ export class VideoService {
             }
 
         }
+        
         let externalAudioSrc = '';
         if (createVideoDto.music && !uuidValidate(createVideoDto.music.id)) {
             externalAudioSrc = createVideoDto.music.uri || '';

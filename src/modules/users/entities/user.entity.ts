@@ -14,6 +14,7 @@ import { Video } from '../../stream/entities/video.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
 import { Bookmark } from 'src/modules/bookmark/entities/bookmark.entity';
 import { UserProfile } from './user-profile.entity';
+import { Comment } from '../../comments/entities/comment.entity';
 
 export enum UserRole {
   USER = 'user',
@@ -88,4 +89,6 @@ export class User {
   @OneToMany(() => Bookmark, (bookmark) => bookmark.user)
   bookmarks: Bookmark[];
 
+  @OneToMany(() => Comment, (comment) => comment.author)
+  comments: Comment[];
 }
