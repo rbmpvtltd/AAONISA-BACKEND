@@ -1,13 +1,18 @@
-import { IsNumber, IsString } from "class-validator";
-import { CreateDateColumn } from "typeorm";
+import { IsInt, IsOptional, IsString, IsArray } from 'class-validator';
 
 export class CreateCommentDto {
-    @IsNumber()
-    user_id: number
+  @IsString()
+  content: string;
 
-    @IsNumber()
-    post_id: number
+  @IsString()
+  postId: string;
 
-    @IsString()
-    comment: string
+  @IsOptional()
+  @IsString()
+  parentId?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  mentions?: string[]; // user IDs mentioned
 }

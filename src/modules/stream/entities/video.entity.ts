@@ -14,6 +14,8 @@ import { Like } from '../../likes/entities/like.entity';
 import { View } from '../../views/entities/view.entity';
 import { IsOptional } from 'class-validator';
 import { Hashtag } from './hashtag.entity';
+import { Bookmark } from 'src/modules/bookmark/entities/bookmark.entity';
+import { Comment } from 'src/modules/comments/entities/comment.entity';
 
 export enum VideoType {
   news = 'news',
@@ -38,7 +40,7 @@ export class Video {
   @Column()
   videoUrl: string;
 
-  @Column({nullable: true})
+  @Column({ nullable: true })
   @IsOptional()
   externalAudioSrc: string;
 
@@ -74,7 +76,17 @@ export class Video {
   @JoinTable()
   mentions: User[];
 
-   @ManyToMany(() => Hashtag, (hashtag) => hashtag.videos, { cascade: true })
+  @ManyToMany(() => Hashtag, (hashtag) => hashtag.videos, { cascade: true })
   @JoinTable()
   hashtags: Hashtag[];
+
+  @ManyToMany(() => Bookmark, (bookmark) => bookmark.reels)
+  bookmarks: Bookmark[];
+
+  
+  @OneToMany(() => Comment, (comment) => comment.reel, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
+  comments: Comment[];
 }

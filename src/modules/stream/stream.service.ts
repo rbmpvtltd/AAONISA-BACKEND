@@ -486,6 +486,7 @@ export class VideoService {
             }
 
         }
+        
         let externalAudioSrc = '';
         if (createVideoDto.music && !uuidValidate(createVideoDto.music.id)) {
             externalAudioSrc = createVideoDto.music.uri || '';
@@ -511,12 +512,14 @@ export class VideoService {
                 overlays: createVideoDto.overlays || [],
             });
             uploadPath = await this.uploadService.uploadFile(processedPath,'stories');
+            fs.unlinkSync(processedPath);
         }else{
             uploadPath = await this.uploadService.uploadFile(compressedPath,createVideoDto.type == VideoType.reels ? 'reels' : 'news');
         }
 
         // Replace original with processed version
-        fs.unlinkSync(videoPath); // delete original if you want
+        fs.unlinkSync(videoPath);
+        fs.unlinkSync(compressedPath);
         filename = processedFilename;
 
         // ---------------- CREATE VIDEO ----------------
