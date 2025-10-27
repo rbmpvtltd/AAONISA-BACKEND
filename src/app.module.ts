@@ -36,8 +36,7 @@ import { ApiOAuth2 } from '@nestjs/swagger';
     ViewModule,
     ShareModule,
     UploadModule,
-    TypeOrmModule.forFeature([Bookmark]),
-    Comment
+    TypeOrmModule.forFeature([Bookmark, Comment]),
   ],
   controllers: [],
   providers: [AppGateway],

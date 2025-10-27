@@ -26,7 +26,7 @@ export class Bookmark {
   @JoinTable({
     name: 'bookmark_reels',
     joinColumn: { name: 'bookmark_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'reel_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'reel_id', referencedColumnName: 'uuid' },
   })
   reels: Video[];
 }
