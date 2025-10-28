@@ -29,7 +29,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd /home/ubuntu/your-repo
+            cd /home/ubuntu/AAONISA-BACKEND
             git pull origin main
             npm install --production
             pm2 restart backend
