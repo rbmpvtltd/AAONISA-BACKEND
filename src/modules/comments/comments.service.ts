@@ -88,7 +88,7 @@ export class CommentService {
 
         const comment = this.commentRepository.create({
             content: dto.content,
-            reel:post,
+            reel: post,
             author,
             parent,
             mentions,
@@ -122,7 +122,7 @@ export class CommentService {
         });
     }
 
-    async findByReplies( commentId: string) {
+    async findByReplies(commentId: string) {
         return this.commentRepository.find({
             where: { parent: { id: commentId } },
             relations: [
@@ -149,4 +149,33 @@ export class CommentService {
 
         return this.commentRepository.remove(comment);
     }
+
+    async likeUnlike(commentId: string, userId: string) {
+        const comment = await this.commentRepository.findOne({
+            where: { id: commentId },
+            relations: ['likedBy'],
+        });
+
+        if (!comment) throw new NotFoundException('Comment not found');
+
+        const user = await this.userRepository.findOneBy({ id: userId });
+        if (!user) throw new NotFoundException('User not found');
+
+        const alreadyLiked = comment.likedBy.some((u) => u.id === userId);
+
+        if (alreadyLiked) {
+            comment.likedBy = comment.likedBy.filter((u) => u.id !== userId);
+        } else {
+            comment.likedBy.push(user);
+        }
+
+        await this.commentRepository.save(comment);
+
+        return {
+            message: alreadyLiked ? 'Unliked successfully' : 'Liked successfully',
+            liked: !alreadyLiked,
+            likesCount: comment.likedBy.length,
+        };
+    }
+
 }
