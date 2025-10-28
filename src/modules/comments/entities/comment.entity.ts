@@ -25,33 +25,37 @@ export class Comment {
   })
   reel: Video;
 
-  // Who wrote the comment
   @ManyToOne(() => User, (user) => user.comments, {
     onDelete: 'SET NULL',
     nullable: true,
   })
   author: User;
 
-  // Parent comment (if reply)
   @ManyToOne(() => Comment, (comment) => comment.replies, {
     onDelete: 'CASCADE',
     nullable: true,
   })
   @JoinColumn({ name: 'parentId' })
-  parent?: Comment|null;
+  parent?: Comment | null;
 
-  // Replies to this comment
   @OneToMany(() => Comment, (comment) => comment.parent)
   replies: Comment[];
 
-  // Mentioned users
   @ManyToMany(() => User)
   @JoinTable({
-    name: 'comment_mentions', // join table for comment ↔ mentions
+    name: 'comment_mentions',
     joinColumn: { name: 'commentId', referencedColumnName: 'id' },
     inverseJoinColumn: { name: 'userId', referencedColumnName: 'id' },
   })
   mentions: User[];
+
+  @ManyToMany(() => User)
+  @JoinTable({
+    name: 'comment_likes', // join table for comment ↔ user like
+    joinColumn: { name: 'commentId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'userId', referencedColumnName: 'id' },
+  })
+  likedBy: User[];
 
   @CreateDateColumn()
   createdAt: Date;
