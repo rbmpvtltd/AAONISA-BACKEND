@@ -272,7 +272,6 @@ export class UserService {
     const userProfile = await this.userProfileRepository.findOne({ where: { user_id: userId } });
     if (!user || !userProfile) throw new NotFoundException('User not found');
 
-    // Username check
     if (dto.username) {
       const existingUser = await this.userRepository.findOne({ where: { username: dto.username } });
       if (existingUser && existingUser.id !== user.id)

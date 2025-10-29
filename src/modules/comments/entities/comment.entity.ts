@@ -51,7 +51,7 @@ export class Comment {
 
   @ManyToMany(() => User)
   @JoinTable({
-    name: 'comment_likes', // join table for comment ↔ user like
+    name: 'comment_likes',
     joinColumn: { name: 'commentId', referencedColumnName: 'id' },
     inverseJoinColumn: { name: 'userId', referencedColumnName: 'id' },
   })
