@@ -84,4 +84,12 @@ export class CommentController {
         const userId = payload?.sub || payload?.id || payload?.userId;
         return this.commentService.delete(id, userId);
     }
+
+    @UseGuards(JwtAuthGuard)
+    @Get('likeUnlikeComment/:id')
+    async likeUnlike(@Param('id') id: string, @Req() req: any) {
+        const payload = req.user;
+        const userId = payload?.sub || payload?.id || payload?.userId;
+        return this.commentService.likeUnlike(id, userId);
+    }
 }
