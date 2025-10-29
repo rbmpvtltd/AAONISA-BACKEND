@@ -28,27 +28,32 @@ function isPrivateHost(hostname: string) {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // app.enableCors({
+  //   origin: (origin, callback) => {
+  //     if (!origin) return callback(null, true);
+
+  //     try {
+  //       const url = new URL(origin);
+  //       const hostname = url.hostname;
+  //       if (isPrivateHost(hostname)) {
+  //         return callback(null, true);
+  //       }
+
+  //       if (hostname === 'localhost' || hostname === '127.0.0.1') {
+  //         return callback(null, true);
+  //       }
+
+  //       return callback(new Error('Not allowed by CORS'), false);
+  //     } catch (err) {
+  //       return callback(new Error('Not allowed by CORS'), false);
+  //     }
+  //   },
+  //   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  //   credentials: true,
+  // });
+
   app.enableCors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-
-      try {
-        const url = new URL(origin);
-        const hostname = url.hostname;
-        if (isPrivateHost(hostname)) {
-          return callback(null, true);
-        }
-
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-          return callback(null, true);
-        }
-
-        return callback(new Error('Not allowed by CORS'), false);
-      } catch (err) {
-        return callback(new Error('Not allowed by CORS'), false);
-      }
-    },
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    origin: true,
     credentials: true,
   });
 

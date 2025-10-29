@@ -7,7 +7,7 @@
 
 # production
 .env
-
+github_deploy_key.pem
 # debug
 npm-debug.log*
 yarn-debug.log*
