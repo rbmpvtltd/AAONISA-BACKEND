@@ -18,6 +18,6 @@ export class UpdateUserProfileDto{
     url?: string
 
     @IsBoolean()
-    imageChanged: boolean;
+    imageChanged: string;
 }
 

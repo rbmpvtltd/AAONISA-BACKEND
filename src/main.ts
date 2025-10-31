@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
 import * as express from 'express';
 import { join } from 'path';
+import * as bodyParser from 'body-parser';
 
 function isPrivateHost(hostname: string) {
   if (!hostname) return false;
@@ -27,7 +28,8 @@ function isPrivateHost(hostname: string) {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
+  app.use(bodyParser.json({ limit: '10mb' }));
+  app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
   // app.enableCors({
   //   origin: (origin, callback) => {
   //     if (!origin) return callback(null, true);

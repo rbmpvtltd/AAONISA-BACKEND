@@ -90,16 +90,10 @@ export class UserController {
     return this.userService.updatePhoneOtp(dto);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('update-profile')
-  @UseInterceptors(FileInterceptor('ProfilePicture'))
-  async updateProfile(
-    @Req() req,
-    @Body() dto: UpdateUserProfileDto,
-    @UploadedFile() file: Multer.File,
-  ) {
-    const payload = req.user;
-    return this.userService.updateProfile(dto, payload, file);
+  @UseGuards(JwtAuthGuard)
+  async updateProfile(@Req() req, @Body() dto: any) {
+    return this.userService.updateProfile(dto, req.user);
   }
 
 
