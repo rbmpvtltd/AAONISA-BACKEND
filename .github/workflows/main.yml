@@ -16,18 +16,18 @@ jobs:
       - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: 65.1.109.193
+          host: 13.233.234.74
           username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
+          key: ${{ secrets.CICD_KEY }}
           source: "."
           target: "/home/ubuntu/AAONISA-BACKEND"
 
       - name: Run deployment commands
         uses: appleboy/ssh-action@v0.1.10
         with:
-          host: 65.1.109.193
+          host: 13.233.234.74
           username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
+          key: ${{ secrets.CICD_KEY }}
           script: |
             cd /home/ubuntu/AAONISA-BACKEND
             git pull origin main
