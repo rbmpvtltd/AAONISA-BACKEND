@@ -30,6 +30,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(bodyParser.json({ limit: '10mb' }));
   app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
+  //retest
   // app.enableCors({
   //   origin: (origin, callback) => {
   //     if (!origin) return callback(null, true);
