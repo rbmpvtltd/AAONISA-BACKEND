@@ -27,7 +27,7 @@ export class VideoController {
   )
   async uploadVideo(
     @UploadedFile() file: Multer.File,
-    @Body() body:any,
+    @Body() body: any,
     @Req() req: Request,
   ) {
     const user = req.user as { userId?: string }
@@ -67,5 +67,15 @@ export class VideoController {
   async findAll(
   ) {
     return this.videoService.findAll();
+  }
+
+  @Get('getAllStories')
+  @UseGuards(JwtAuthGuard)
+  async getAllStories(@Req() req) {
+     const user = req.user as { userId?: string }
+    if (!user || !user.userId) {
+      throw new BadRequestException('Invalid or missing user ID in token.');
+    }
+    return this.videoService.getAllStories(user.userId);
   }
 }
