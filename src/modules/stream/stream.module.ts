@@ -10,8 +10,9 @@ import { Hashtag } from './entities/hashtag.entity';
 import { AppGateway } from 'src/app.gateway';
 import { UploadService } from '../upload/upload.service';
 import { BullModule } from '@nestjs/bull';
+import { Follow } from '../follows/entities/follow.entity';
 @Module({
-  imports: [TypeOrmModule.forFeature([Video, Audio,User,Hashtag]),UserProfileModule,BullModule.registerQueue({name:'story-delete'},{name:'hashtag-cleanup'})],
+  imports: [TypeOrmModule.forFeature([Video, Audio,User,Hashtag,Follow]),UserProfileModule,BullModule.registerQueue({name:'story-delete'},{name:'hashtag-cleanup'})],
   controllers: [VideoController],
   providers: [VideoService,AppGateway,UploadService],
 })

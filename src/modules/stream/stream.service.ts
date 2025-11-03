@@ -16,6 +16,7 @@ import { validate as uuidValidate } from 'uuid';
 import { UploadService } from '../upload/upload.service';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
+import { Follow } from '../follows/entities/follow.entity';
 
 const { createCanvas } = require('canvas');
 
@@ -55,6 +56,8 @@ export class VideoService {
         private readonly storyDeleteQueue: Queue,
         @InjectQueue('hashtag-cleanup')
         private readonly hashtagCleanupQueue: Queue,
+        @InjectRepository(Follow)
+        private readonly followRepository: Repository<Follow>,
     ) { }
     private async checkIfVideoHasAudio(filePath: string): Promise<boolean> {
         return new Promise((resolve, reject) => {
@@ -665,4 +668,58 @@ export class VideoService {
         video.archived = true;
         return this.videoRepository.save(video);
     }
+
+    async getAllStories(userId: string) {
+  // Logged in user
+  const user = await this.userRepository.findOne({
+    where: { id: userId },
+    relations: ["userProfile", "videos"]
+  });
+
+  if(!user) throw new NotFoundException('User not found');
+  // User ki khud ki stories
+  const selfStories = user.videos.filter(v => v.type === "story");
+
+  // Find whom user is following
+  const following = await this.followRepository.find({
+    where: { follower: { id: userId } },
+    relations: ["following", "following.userProfile", "following.videos"]
+  });
+
+  // Prepare all story users (self + following)
+  const storyUsers = [
+    {
+      username: user.username,
+      profilePic: user.userProfile?.ProfilePicture || "",
+      owner: user.id,
+      self: true,
+      stories: selfStories.map(story => ({
+        id: story.uuid,
+        videoUrl: story.videoUrl,
+        duration: 15,
+        viewed: false
+      }))
+    },
+    ...following.map(f => {
+      const u = f.following;
+      const userStories = u.videos.filter(v => v.type === "story");
+
+      return {
+        username: u.username,
+        profilePic: u.userProfile?.ProfilePicture || "",
+        owner: u.id,
+        self: false,
+        stories: userStories.map(story => ({
+          id: story.uuid,
+          videoUrl: story.videoUrl,
+          duration: 15,
+          viewed: false
+        }))
+      };
+    })
+  ];
+
+  return storyUsers.filter(user => user.stories.length > 0);
+}
+
 }
