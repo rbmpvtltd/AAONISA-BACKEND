@@ -57,12 +57,13 @@ export class BookmarkController {
     // }
 
     @UseGuards(JwtAuthGuard)
-    @Delete('deleteBookmark/:id')
-    remove(@Param('id', ParseIntPipe) id: number, @Req() req) {
+    @Post('deleteBookmark')
+    remove(@Body('id', ParseIntPipe) id: number, @Req() req) {
         const payload = req.user;
         const userId = payload?.sub || payload?.id || payload?.userId;
         return this.bookmarkService.remove(userId, id);
     }
+
 
     @UseGuards(JwtAuthGuard)
     @Get('getReelsOfBookmark/:id')
