@@ -322,7 +322,7 @@ export class UserService {
     await this.userRepository.save(user);
   }
 
-async allUusersDetails() {
+async function allUusersDetails() {
     const users = await this.userRepository.find({ relations: ['userProfile'], });
 
   if (!users || users.length === 0) {
