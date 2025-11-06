@@ -72,7 +72,7 @@ export class User {
   views: View[];
 
   @OneToMany(() => Video, (video) => video.user_id, { cascade: true })
-  videos: Video[];
+  videos: Video;
 
   @ManyToMany(() => Video, (video) => video.mentions)
   mentionedIn: Video[];
