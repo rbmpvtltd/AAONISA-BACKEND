@@ -20,6 +20,7 @@ import { EmailService } from '../otp/email.service';
 import { SmsService } from '../otp/sms.service';
 import { extname } from 'path';
 import { Follow } from '../follows/entities/follow.entity';
+import { Video } from '../stream/entities/video.entity';
 const fs = require('fs');
 const path = require('path');
 @Injectable()
@@ -31,6 +32,7 @@ export class UserService {
     private readonly userProfileRepository: Repository<UserProfile>,
        @InjectRepository(Follow) // ✅ Add this line
     private readonly followRepository: Repository<Follow>,
+     @InjectRepository(Video) private videoRepository: Repository<Video>,
     private readonly authService: AuthService,
     private readonly otpService: OtpService,
     private readonly emailService: EmailService,
@@ -320,6 +322,15 @@ export class UserService {
     await this.userRepository.save(user);
   }
 
+async allUusersDetails() {
+    const users = await this.userRepository.find({ relations: ['userProfile'], });
+
+  if (!users || users.length === 0) {
+    return { success: false, message: 'No users found' };
+  }
+  return users;
+}
+
   return { success: true, message: 'Profile updated successfully',dataUri: userProfile.url};
 }
 
@@ -383,6 +394,19 @@ async getProfileByUsername(username: string) {
     .where('follow.followerId = :userId', { userId })
     .getRawMany();
 
+      // Step 4: Fetch user’s videos
+  const videos = await this.videoRepository
+    .createQueryBuilder('video')
+    .leftJoinAndSelect('video.audio', 'audio')
+    .leftJoinAndSelect('video.hashtags', 'hashtags')
+    .leftJoinAndSelect('video.likes', 'likes')
+    .leftJoinAndSelect('video.views', 'views')
+    .where('video.user_id = :userId', { userId })
+    .orderBy('video.created_at', 'DESC')
+    .getMany();
+
+  console.log('🎥 Videos found:', videos.length);
+
   console.log('📊 Followers count:', followers.length);
   console.log('📊 Followings count:', followings.length);
 
@@ -396,6 +420,7 @@ async getProfileByUsername(username: string) {
     userProfile: user.userProfile,
     followers,
     followings,
+    videos
   };
 }
 
@@ -404,7 +429,7 @@ async getProfileByUsername(username: string) {
       where: { username: Like(`%${query}%`), },
       relations: ['userProfile']
     });
-
+    
     if (!users) {
       console.log('No users found');
     }
@@ -522,3 +547,5 @@ async getProfileByUsername(username: string) {
 
   }
 } 
+
+

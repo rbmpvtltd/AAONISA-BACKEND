@@ -96,6 +96,13 @@ export class UserController {
     return this.userService.updateProfile(dto, req.user);
   }
 
+  
+  @UseGuards(JwtAuthGuard)
+  @Get('all-users')
+  async allUusersDetails() {
+    return this.userService.allUusersDetails();
+  }
+
 
   @UseGuards(JwtAuthGuard)
   @Get('profile/current')
