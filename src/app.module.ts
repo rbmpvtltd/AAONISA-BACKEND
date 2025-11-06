@@ -18,7 +18,7 @@ import { BookmarkModule } from './modules/bookmark/bookmark.module';
 import { ApiOAuth2 } from '@nestjs/swagger';
 import { CommentModule } from './modules/comments/comments.module';
 @Module({
-  imports: [ 
+  imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRootAsync({
       useFactory: () => {
@@ -44,5 +44,9 @@ import { CommentModule } from './modules/comments/comments.module';
   ],
   controllers: [],
   providers: [AppGateway],
+  exports: [AppGateway],  // ✅ add this
+
 })
+
+// checking ci/cd
 export class AppModule { }
