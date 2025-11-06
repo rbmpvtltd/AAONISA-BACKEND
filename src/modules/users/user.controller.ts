@@ -16,10 +16,13 @@ import { UpdateEmailOtp, UpdatePhoneOtp, UpdateUserEmail, UpdateUserPhone } from
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { Response } from 'express';
 import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
+import { BlockUserDto } from './dto/block.dto';
+import { BlockService } from './block.service';
+
 import * as path from 'path';
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) { }
+  constructor(private readonly userService: UserService, private readonly blockService: BlockService) { }
 
   @Post('register-check')
   registerCheck(@Body() dto: PreRegisterDto) {
@@ -87,16 +90,10 @@ export class UserController {
     return this.userService.updatePhoneOtp(dto);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('update-profile')
-  @UseInterceptors(FileInterceptor('ProfilePicture'))
-  async updateProfile(
-    @Req() req,
-    @Body() dto: UpdateUserProfileDto,
-    @UploadedFile() file: Multer.File,
-  ) {
-    const payload = req.user;
-    return this.userService.updateProfile(dto, payload, file);
+  @UseGuards(JwtAuthGuard)
+  async updateProfile(@Req() req, @Body() dto: any) {
+    return this.userService.updateProfile(dto, req.user);
   }
 
   
@@ -111,7 +108,7 @@ export class UserController {
   @Get('profile/current')
   async getCurrentUser(@Req() req) {
     // const userId = req.user?.id;
-    const payload = req.user;   
+    const payload = req.user;
     const userId = payload?.sub || payload?.id || payload?.userId;
     return this.userService.getCurrentUser(userId);
   }
@@ -143,5 +140,29 @@ export class UserController {
   updateUserPhone(@Req() req, @Body() dto: UpdateUserPhone) {
     const payload = req.user
     return this.userService.updateUserPhone(dto, payload);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('block-user')
+  async blockUser(@Body() dto: BlockUserDto, @Req() req: any) {
+    const payload = req.user;
+    const userId = payload?.sub || payload?.id || payload?.userId;
+    return this.blockService.blockUser(dto, userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('unblock-user')
+  async unblockUser(@Body() dto: BlockUserDto, @Req() req: any) {
+    const payload = req.user;
+    const userId = payload?.sub || payload?.id || payload?.userId;
+    return this.blockService.unblockUser(dto, userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('get-blocked-users')
+  async getBlockedUsers(@Req() req: any) {
+    const payload = req.user;
+    const userId = payload?.sub || payload?.id || payload?.userId;
+    return this.blockService.getBlockedUsers(userId);
   }
 }

@@ -1,20 +1,62 @@
-// import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  OneToMany,
+  ManyToMany,
+  JoinTable,
+  CreateDateColumn,
+  JoinColumn,
+} from 'typeorm';
+import { User } from 'src/modules/users/entities/user.entity';
+import { Video } from 'src/modules/stream/entities/video.entity';
 
-// @Entity()
-// // export class Comment {
-//     @PrimaryGeneratedColumn({type : 'int'})
-//     id: number
+@Entity()
+export class Comment {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-//     @Column( {type : 'int'} )
-//     user_id: number 
+  @Column({ type: 'text' })
+  content: string;
 
-//     @Column( {type : 'int'} )
-//     post_id: number
+  @ManyToOne(() => Video, (reel) => reel.comments, {
+    onDelete: 'CASCADE',
+  })
+  reel: Video;
 
-//     @Column( {type : 'varchar'})
-//     comment: string
+  @ManyToOne(() => User, (user) => user.comments, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  author: User;
 
-//   @CreateDateColumn( {type : 'date'} )
-//   created_at: Date;
+  @ManyToOne(() => Comment, (comment) => comment.replies, {
+    onDelete: 'CASCADE',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'parentId' })
+  parent?: Comment | null;
 
-// }
+  @OneToMany(() => Comment, (comment) => comment.parent)
+  replies: Comment[];
+
+  @ManyToMany(() => User)
+  @JoinTable({
+    name: 'comment_mentions',
+    joinColumn: { name: 'commentId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'userId', referencedColumnName: 'id' },
+  })
+  mentions: User[];
+
+  @ManyToMany(() => User)
+  @JoinTable({
+    name: 'comment_likes',
+    joinColumn: { name: 'commentId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'userId', referencedColumnName: 'id' },
+  })
+  likedBy: User[];
+
+  @CreateDateColumn()
+  createdAt: Date;
+}

@@ -14,6 +14,10 @@ import { Request, Response } from 'express';
 import { AppGateway } from 'src/app.gateway';
 import { validate as uuidValidate } from 'uuid';
 import { UploadService } from '../upload/upload.service';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { Follow } from '../follows/entities/follow.entity';
+
 const { createCanvas } = require('canvas');
 
 interface OverlayMetadata {
@@ -47,7 +51,13 @@ export class VideoService {
         @InjectRepository(Hashtag)
         private readonly hashtagRepo: Repository<Hashtag>,
         private readonly gateway: AppGateway,
-        private readonly uploadService: UploadService
+        private readonly uploadService: UploadService,
+        @InjectQueue('story-delete')
+        private readonly storyDeleteQueue: Queue,
+        @InjectQueue('hashtag-cleanup')
+        private readonly hashtagCleanupQueue: Queue,
+        @InjectRepository(Follow)
+        private readonly followRepository: Repository<Follow>,
     ) { }
     private async checkIfVideoHasAudio(filePath: string): Promise<boolean> {
         return new Promise((resolve, reject) => {
@@ -421,14 +431,16 @@ export class VideoService {
             if (hasAudio) {
                 await this.extractAudioFromVideo(videoPath, audioPath);
 
+                const uploadedAudio = await this.uploadService.uploadFile(audioPath, 'audios');
                 audio = this.audioRepository.create({
                     uuid: uuidv4(),
-                    name: audioFilename,
+                    name: uploadedAudio.publicUrl,
                     category: 'auto-extracted',
                     author: userId,
                 });
 
                 await this.audioRepository.save(audio);
+                fs.unlinkSync(audioPath);
             }
         }
 
@@ -486,6 +498,7 @@ export class VideoService {
             }
 
         }
+
         let externalAudioSrc = '';
         if (createVideoDto.music && !uuidValidate(createVideoDto.music.id)) {
             externalAudioSrc = createVideoDto.music.uri || '';
@@ -510,13 +523,15 @@ export class VideoService {
                 filterColor: createVideoDto.filter || 'transparent',
                 overlays: createVideoDto.overlays || [],
             });
-            uploadPath = await this.uploadService.uploadFile(processedPath,'stories');
-        }else{
-            uploadPath = await this.uploadService.uploadFile(compressedPath,createVideoDto.type == VideoType.reels ? 'reels' : 'news');
+            uploadPath = await this.uploadService.uploadFile(processedPath, 'stories');
+            fs.unlinkSync(processedPath);
+        } else {
+            uploadPath = await this.uploadService.uploadFile(compressedPath, createVideoDto.type == VideoType.reels ? 'reels' : 'news');
         }
 
         // Replace original with processed version
-        fs.unlinkSync(videoPath); // delete original if you want
+        fs.unlinkSync(videoPath);
+        fs.unlinkSync(compressedPath);
         filename = processedFilename;
 
         // ---------------- CREATE VIDEO ----------------
@@ -534,6 +549,36 @@ export class VideoService {
 
         await this.videoRepository.save(video);
 
+        if (createVideoDto.type === VideoType.story) {
+            await this.storyDeleteQueue.add(
+                { videoId: video.uuid },
+                { delay: 24 * 60 * 60 * 1000 },
+            );
+
+            console.log(`Scheduled story deletion after 24h (ID: ${video.uuid})`);
+        }
+
+        const hashtagsToClean = (video.hashtags || []).map(h => h.id || h.tag);
+        // Note: map to whatever unique identifier your Hashtag entity uses (id/uuid/tag)
+
+        if (hashtagsToClean.length) {
+            // 7 days in ms
+            const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+            await this.hashtagCleanupQueue.add(
+                'removeVideoFromHashtags', // job name (optional)
+                {
+                    videoId: video.uuid,
+                    hashtagIdentifiers: hashtagsToClean,
+                },
+                {
+                    delay: sevenDaysMs,
+                    attempts: 3,
+                    backoff: { type: 'exponential', delay: 60 * 1000 }, // retry strategy
+                    removeOnComplete: true,
+                    removeOnFail: false,
+                },
+            );
+        }
         for (const mentionedUser of mentionedUsers) {
             this.gateway.emitToUser(
                 mentionedUser.id,
@@ -623,4 +668,58 @@ export class VideoService {
         video.archived = true;
         return this.videoRepository.save(video);
     }
+
+    async getAllStories(userId: string) {
+  // Logged in user
+  const user = await this.userRepository.findOne({
+    where: { id: userId },
+    relations: ["userProfile", "videos"]
+  });
+
+  if(!user) throw new NotFoundException('User not found');
+  // User ki khud ki stories
+  const selfStories = user.videos.filter(v => v.type === "story");
+
+  // Find whom user is following
+  const following = await this.followRepository.find({
+    where: { follower: { id: userId } },
+    relations: ["following", "following.userProfile", "following.videos"]
+  });
+
+  // Prepare all story users (self + following)
+  const storyUsers = [
+    {
+      username: user.username,
+      profilePic: user.userProfile?.ProfilePicture || "",
+      owner: user.id,
+      self: true,
+      stories: selfStories.map(story => ({
+        id: story.uuid,
+        videoUrl: story.videoUrl,
+        duration: 15,
+        viewed: false
+      }))
+    },
+    ...following.map(f => {
+      const u = f.following;
+      const userStories = u.videos.filter(v => v.type === "story");
+
+      return {
+        username: u.username,
+        profilePic: u.userProfile?.ProfilePicture || "",
+        owner: u.id,
+        self: false,
+        stories: userStories.map(story => ({
+          id: story.uuid,
+          videoUrl: story.videoUrl,
+          duration: 15,
+          viewed: false
+        }))
+      };
+    })
+  ];
+
+  return storyUsers.filter(user => user.stories.length > 0);
+}
+
 }

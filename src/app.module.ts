@@ -11,10 +11,14 @@ import { AuthModule } from './modules/auth/auth.module';
 import { StreamModule } from './modules/stream/stream.module';
 import { FollowModule } from './modules/follows/follow.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { Bookmark } from './modules/bookmark/entities/bookmark.entity';
 import { AppGateway } from './app.gateway';
+import { Comment } from './modules/comments/entities/comment.entity';
+import { BookmarkModule } from './modules/bookmark/bookmark.module';
 import { ApiOAuth2 } from '@nestjs/swagger';
+import { CommentModule } from './modules/comments/comments.module';
 @Module({
-  imports: [ 
+  imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRootAsync({
       useFactory: () => {
@@ -33,9 +37,16 @@ import { ApiOAuth2 } from '@nestjs/swagger';
     LikeModule,
     ViewModule,
     ShareModule,
-    UploadModule
+    UploadModule,
+    BookmarkModule,
+    CommentModule,
+    TypeOrmModule.forFeature([Bookmark, Comment]),
   ],
   controllers: [],
   providers: [AppGateway],
+  exports: [AppGateway],  // ✅ add this
+
 })
+
+// checking ci/cd
 export class AppModule { }
