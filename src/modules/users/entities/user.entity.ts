@@ -15,7 +15,9 @@ import { Notification } from '../../notifications/entities/notification.entity';
 import { Bookmark } from 'src/modules/bookmark/entities/bookmark.entity';
 import { UserProfile } from './user-profile.entity';
 import { Comment } from '../../comments/entities/comment.entity';
-
+import { TokenEntity } from 'src/modules/tokens/entities/token.entity';
+import { is } from 'drizzle-orm';
+import { IsOptional } from 'class-validator';
 export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
@@ -91,4 +93,8 @@ export class User {
 
   @OneToMany(() => Comment, (comment) => comment.author)
   comments: Comment[];
+
+  @IsOptional()
+  @OneToMany(() => TokenEntity, (token) => token.user)
+  tokens?: TokenEntity[]
 }
