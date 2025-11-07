@@ -294,7 +294,7 @@ export class UserService {
 
     // ✅ Upload new one
     const uploaded = await this.uploadService.uploadFile(buffer, "profiles", fileName);
-    userProfile.ProfilePicture = uploaded.url;
+    userProfile.ProfilePicture = uploaded.publicUrl || uploaded.url;
   }
 
   // ✅ If user removed image
