@@ -30,9 +30,9 @@ export class UserService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(UserProfile)
     private readonly userProfileRepository: Repository<UserProfile>,
-       @InjectRepository(Follow) // ✅ Add this line
+    @InjectRepository(Follow) // ✅ Add this line
     private readonly followRepository: Repository<Follow>,
-     @InjectRepository(Video) private videoRepository: Repository<Video>,
+    @InjectRepository(Video) private videoRepository: Repository<Video>,
     private readonly authService: AuthService,
     private readonly otpService: OtpService,
     private readonly emailService: EmailService,
@@ -267,170 +267,181 @@ export class UserService {
   // }
 
   async updateProfile(dto: any, payload: any) {
-  const userId = payload?.sub || payload?.id|| payload?.userId;
-  if (!userId) throw new UnauthorizedException('Invalid token');
+    const userId = payload?.sub || payload?.id || payload?.userId;
+    if (!userId) throw new UnauthorizedException('Invalid token');
 
-  const user = await this.userRepository.findOne({ where: { id: userId } });
-  const userProfile = await this.userProfileRepository.findOne({ where: { user_id: userId } });
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const userProfile = await this.userProfileRepository.findOne({ where: { user_id: userId } });
 
-  if (!user || !userProfile) throw new NotFoundException('User not found');
+    if (!user || !userProfile) throw new NotFoundException('User not found');
 
-  // Convert string -> boolean
-  const imageChanged = dto.imageChanged === 'true' || dto.imageChanged === true;
-  // ✅ If base64 image is sent
-  if (imageChanged && dto.ProfilePicture) {
-    const base64Str = dto.ProfilePicture.split(';base64,')[1];
+    // Convert string -> boolean
+    const imageChanged = dto.imageChanged === 'true' || dto.imageChanged === true;
+    // ✅ If base64 image is sent
+    if (imageChanged && dto.ProfilePicture) {
+      const base64Str = dto.ProfilePicture.split(';base64,')[1];
 
-    if (!base64Str) throw new BadRequestException("Invalid base64 image");
+      if (!base64Str) throw new BadRequestException("Invalid base64 image");
 
-    const buffer = Buffer.from(base64Str, 'base64');
-    const fileName = `${userId}.jpg`;
+      const buffer = Buffer.from(base64Str, 'base64');
+      const fileName = `${userId}.jpg`;
 
-    // ✅ Remove old image from storage
-    if (userProfile.ProfilePicture) {
-      const oldKey = userProfile.ProfilePicture.split('.com/')[1];
-      if (oldKey) await this.uploadService.deleteFile(oldKey);
+      // ✅ Remove old image from storage
+      if (userProfile.ProfilePicture) {
+        const oldKey = userProfile.ProfilePicture.split('.com/')[1];
+        if (oldKey) await this.uploadService.deleteFile(oldKey);
+      }
+
+      // ✅ Upload new one
+      const uploaded = await this.uploadService.uploadFile(buffer, "profiles", fileName);
+      userProfile.ProfilePicture = uploaded.publicUrl || uploaded.url;
     }
 
-    // ✅ Upload new one
-    const uploaded = await this.uploadService.uploadFile(buffer, "profiles", fileName);
-    userProfile.ProfilePicture = uploaded.publicUrl || uploaded.url;
-  }
-
-  // ✅ If user removed image
-  if (imageChanged && !dto.ProfilePicture) {
-    if (userProfile.ProfilePicture) {
-      const oldKey = userProfile.ProfilePicture.split('.com/')[1];
-      if (oldKey) await this.uploadService.deleteFile(oldKey);
+    // ✅ If user removed image
+    if (imageChanged && !dto.ProfilePicture) {
+      if (userProfile.ProfilePicture) {
+        const oldKey = userProfile.ProfilePicture.split('.com/')[1];
+        if (oldKey) await this.uploadService.deleteFile(oldKey);
+      }
+      userProfile.ProfilePicture = '';
     }
-    userProfile.ProfilePicture = '';
-  }
 
-  // ✅ Update text fields
-  userProfile.name = dto.name || userProfile.name;
-  userProfile.bio = dto.bio || userProfile.bio;
-  userProfile.url = dto.url || userProfile.url;
-  await this.userProfileRepository.save(userProfile);
+    // ✅ Update text fields
+    userProfile.name = dto.name || userProfile.name;
+    userProfile.bio = dto.bio || userProfile.bio;
+    userProfile.url = dto.url || userProfile.url;
+    await this.userProfileRepository.save(userProfile);
 
-  // ✅ Username
-  if (dto.username) {
-    const existingUser = await this.userRepository.findOne({ where: { username: dto.username } });
-    if (existingUser && existingUser.id !== user.id)
-      throw new BadRequestException('Username already taken');
+    // ✅ Username
+    if (dto.username) {
+      const existingUser = await this.userRepository.findOne({ where: { username: dto.username } });
+      if (existingUser && existingUser.id !== user.id)
+        throw new BadRequestException('Username already taken');
 
-    user.username = dto.username;
-    await this.userRepository.save(user);
+      user.username = dto.username;
+      await this.userRepository.save(user);
+    }
+    return {
+      success: true,
+      message: "Profile updated successfully",
+      data: {
+        username: user.username,
+        name: userProfile.name,
+        bio: userProfile.bio,
+        url: userProfile.url,
+        profilePicture: userProfile.ProfilePicture,  // ✅ correct image URL
+      }
+    };
+
   }
-  return { success: true, message: 'Profile updated successfully',dataUri: userProfile.url};
-  }
-async  allUusersDetails() {
+  async allUusersDetails() {
     const users = await this.userRepository.find({ relations: ['userProfile'], });
 
-  if (!users || users.length === 0) {
-    return { success: false, message: 'No users found' };
+    if (!users || users.length === 0) {
+      return { success: false, message: 'No users found' };
+    }
+    return users;
+
+
+    // return { success: true, message: 'Profile updated successfully',dataUri: userProfile.url};
   }
-  return users;
 
 
-  // return { success: true, message: 'Profile updated successfully',dataUri: userProfile.url};
-}
-
-
-async getCurrentUser(userId: string) {
-  // const user = await this.userRepository.findOneBy({ id: userId }) ;
+  async getCurrentUser(userId: string) {
+    // const user = await this.userRepository.findOneBy({ id: userId }) ;
 
     const user = await this.userRepository.findOne({
-    where: { id: userId },
-    relations: ['userProfile'], 
-  });
+      where: { id: userId },
+      relations: ['userProfile'],
+    });
 
-  if (!user) {
-    return { success: false, message: 'User not found' };
-  }
-  return { success: true, userProfile: user };
-}
-
-async getProfileByUsername(username: string) {
-  console.log('🔍 getProfileByUsername called for:', username);
-
-  // Step 1: Get user info with profile
-  const user = await this.userRepository
-    .createQueryBuilder('user')
-    .leftJoinAndSelect('user.userProfile', 'userProfile')
-    .where('user.username = :username', { username })
-    .getOne();
-
-  if (!user) {
-    throw new NotFoundException('User not found');
+    if (!user) {
+      return { success: false, message: 'User not found' };
+    }
+    return { success: true, userProfile: user };
   }
 
-  const userId = user.id;
-  console.log(' User found:', userId, user.username);
+  async getProfileByUsername(username: string) {
+    console.log('🔍 getProfileByUsername called for:', username);
 
-  // Step 2: Followers (who follows this user)
-  const followers = await this.followRepository
-    .createQueryBuilder('follow')
-    .leftJoin('follow.follower', 'follower') // relation join
-    .leftJoin('follower.userProfile', 'followerProfile')
-    .select([
-      'follower.id AS id',
-      'follower.username AS username',
-      'followerProfile.name AS name',
-      'followerProfile.ProfilePicture AS ProfilePicture'
-    ])
-    .where('follow.followingId = :userId', { userId })
-    .getRawMany();
+    // Step 1: Get user info with profile
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.userProfile', 'userProfile')
+      .where('user.username = :username', { username })
+      .getOne();
 
-  // Step 3: Followings (whom this user follows)
-  const followings = await this.followRepository
-    .createQueryBuilder('follow')
-    .leftJoin('follow.following', 'following')
-    .leftJoin('following.userProfile', 'followingProfile')
-    .select([
-      'following.id AS id',
-      'following.username AS username',
-      'followingProfile.name AS name',
-      'followingProfile.ProfilePicture AS ProfilePicture'
-    ])
-    .where('follow.followerId = :userId', { userId })
-    .getRawMany();
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
 
-      // Step 4: Fetch user’s videos
-  const videos = await this.videoRepository
-    .createQueryBuilder('video')
-    .leftJoinAndSelect('video.audio', 'audio')
-    .leftJoinAndSelect('video.hashtags', 'hashtags')
-    .leftJoinAndSelect('video.likes', 'likes')
-    .leftJoinAndSelect('video.views', 'views')
-    .where('video.user_id = :userId', { userId })
-    .orderBy('video.created_at', 'DESC')
-    .getMany();
+    const userId = user.id;
+    console.log(' User found:', userId, user.username);
 
-  console.log('🎥 Videos found:', videos.length);
+    // Step 2: Followers (who follows this user)
+    const followers = await this.followRepository
+      .createQueryBuilder('follow')
+      .leftJoin('follow.follower', 'follower') // relation join
+      .leftJoin('follower.userProfile', 'followerProfile')
+      .select([
+        'follower.id AS id',
+        'follower.username AS username',
+        'followerProfile.name AS name',
+        'followerProfile.ProfilePicture AS ProfilePicture'
+      ])
+      .where('follow.followingId = :userId', { userId })
+      .getRawMany();
 
-  console.log('📊 Followers count:', followers.length);
-  console.log('📊 Followings count:', followings.length);
+    // Step 3: Followings (whom this user follows)
+    const followings = await this.followRepository
+      .createQueryBuilder('follow')
+      .leftJoin('follow.following', 'following')
+      .leftJoin('following.userProfile', 'followingProfile')
+      .select([
+        'following.id AS id',
+        'following.username AS username',
+        'followingProfile.name AS name',
+        'followingProfile.ProfilePicture AS ProfilePicture'
+      ])
+      .where('follow.followerId = :userId', { userId })
+      .getRawMany();
 
-  // Step 4: Final response
-  return {
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    phone_no: user.phone_no,
-    role: user.role,
-    userProfile: user.userProfile,
-    followers,
-    followings,
-    videos
-  };
-}
+    // Step 4: Fetch user’s videos
+    const videos = await this.videoRepository
+      .createQueryBuilder('video')
+      .leftJoinAndSelect('video.audio', 'audio')
+      .leftJoinAndSelect('video.hashtags', 'hashtags')
+      .leftJoinAndSelect('video.likes', 'likes')
+      .leftJoinAndSelect('video.views', 'views')
+      .where('video.user_id = :userId', { userId })
+      .orderBy('video.created_at', 'DESC')
+      .getMany();
+
+    console.log('🎥 Videos found:', videos.length);
+
+    console.log('📊 Followers count:', followers.length);
+    console.log('📊 Followings count:', followings.length);
+
+    // Step 4: Final response
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      phone_no: user.phone_no,
+      role: user.role,
+      userProfile: user.userProfile,
+      followers,
+      followings,
+      videos
+    };
+  }
 
   async searchUsers(query?: string) {
     const users = await this.userRepository.find({
       where: { username: Like(`%${query}%`), },
       relations: ['userProfile']
     });
-    
+
     if (!users) {
       console.log('No users found');
     }
@@ -547,6 +558,6 @@ async getProfileByUsername(username: string) {
   async getFollowState() {
 
   }
-} 
+}
 
 
