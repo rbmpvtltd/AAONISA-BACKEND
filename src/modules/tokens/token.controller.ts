@@ -7,8 +7,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 @Controller('tokens')
 export class TokenController {
   constructor(private readonly tokenService: TokenService) {}
-    @UseGuards(JwtAuthGuard)
-  @Post('register')
+  @Post('create')
   create(@Body() dto: CreateTokenDto) {
     return this.tokenService.createToken(dto);
   }
