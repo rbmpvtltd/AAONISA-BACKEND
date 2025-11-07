@@ -1,7 +1,9 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsUUID } from 'class-validator';
 
 export class AssignTokenDto {
+  @IsUUID()
+  userId: string;
+
   @IsString()
-  @IsNotEmpty()
   token: string;
 }

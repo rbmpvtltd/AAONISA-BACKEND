@@ -17,6 +17,7 @@ import { Comment } from './modules/comments/entities/comment.entity';
 import { BookmarkModule } from './modules/bookmark/bookmark.module';
 import { ApiOAuth2 } from '@nestjs/swagger';
 import { CommentModule } from './modules/comments/comments.module';
+import { TokenModule } from './modules/tokens/token.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -40,6 +41,7 @@ import { CommentModule } from './modules/comments/comments.module';
     UploadModule,
     BookmarkModule,
     CommentModule,
+    TokenModule,
     TypeOrmModule.forFeature([Bookmark, Comment]),
   ],
   controllers: [],

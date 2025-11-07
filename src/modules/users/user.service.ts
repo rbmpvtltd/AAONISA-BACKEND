@@ -321,6 +321,7 @@ export class UserService {
     user.username = dto.username;
     await this.userRepository.save(user);
   }
+  return { success: true, message: 'Profile updated successfully',dataUri: userProfile.url};
   }
 async  allUusersDetails() {
     const users = await this.userRepository.find({ relations: ['userProfile'], });
