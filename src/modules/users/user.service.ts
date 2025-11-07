@@ -275,64 +275,66 @@ export class UserService {
 
     if (!user || !userProfile) throw new NotFoundException('User not found');
 
-    // Convert string -> boolean
     const imageChanged = dto.imageChanged === 'true' || dto.imageChanged === true;
-    // ✅ If base64 image is sent
+
+    // ✅ Upload new image
     if (imageChanged && dto.ProfilePicture) {
       const base64Str = dto.ProfilePicture.split(';base64,')[1];
-
       if (!base64Str) throw new BadRequestException("Invalid base64 image");
 
       const buffer = Buffer.from(base64Str, 'base64');
       const fileName = `${userId}.jpg`;
 
-      // ✅ Remove old image from storage
       if (userProfile.ProfilePicture) {
         const oldKey = userProfile.ProfilePicture.split('.com/')[1];
         if (oldKey) await this.uploadService.deleteFile(oldKey);
       }
 
-      // ✅ Upload new one
       const uploaded = await this.uploadService.uploadFile(buffer, "profiles", fileName);
       userProfile.ProfilePicture = uploaded.publicUrl || uploaded.url;
     }
 
-    // ✅ If user removed image
+    // ✅ Remove image
     if (imageChanged && !dto.ProfilePicture) {
       if (userProfile.ProfilePicture) {
         const oldKey = userProfile.ProfilePicture.split('.com/')[1];
         if (oldKey) await this.uploadService.deleteFile(oldKey);
       }
-      userProfile.ProfilePicture = '';
-    }
 
-    // ✅ Update text fields
-    userProfile.name = dto.name || userProfile.name;
-    userProfile.bio = dto.bio || userProfile.bio;
-    userProfile.url = dto.url || userProfile.url;
-    await this.userProfileRepository.save(userProfile);
+      // ✅ Update profile fields
+      userProfile.name = dto.name ?? userProfile.name;
+      userProfile.bio = dto.bio ?? userProfile.bio;
+      userProfile.url = dto.url ?? userProfile.url;
 
-    // ✅ Username
-    if (dto.username) {
-      const existingUser = await this.userRepository.findOne({ where: { username: dto.username } });
-      if (existingUser && existingUser.id !== user.id)
-        throw new BadRequestException('Username already taken');
+      await this.userProfileRepository.save(userProfile);
 
-      user.username = dto.username;
-      await this.userRepository.save(user);
-    }
-    return {
-      success: true,
-      message: "Profile updated successfully",
-      data: {
-        username: user.username,
-        name: userProfile.name,
-        bio: userProfile.bio,
-        url: userProfile.url,
-        profilePicture: userProfile.ProfilePicture,  // ✅ correct image URL
+      // ✅ Update username
+      if (dto.username) {
+        const existingUser = await this.userRepository.findOne({ where: { username: dto.username } });
+        if (existingUser && existingUser.id !== user.id)
+          throw new BadRequestException('Username already taken');
+
       }
-    };
 
+      // ✅ ✅ MOST IMPORTANT: re-fetch updated data
+      const updatedUser = await this.userRepository.findOne({
+        where: { id: userId },
+        relations: ["userProfile"]
+      });
+      if (!updatedUser) throw new NotFoundException('User not found');
+
+      return {
+        success: true,
+        message: "Profile updated successfully",
+        data: {
+          username: updatedUser.username,
+          name: updatedUser.userProfile.name,
+          bio: updatedUser.userProfile.bio,
+          url: updatedUser.userProfile.url,
+          profilePicture: updatedUser.userProfile.ProfilePicture,
+        }
+      };
+    }
   }
   async allUusersDetails() {
     const users = await this.userRepository.find({ relations: ['userProfile'], });
