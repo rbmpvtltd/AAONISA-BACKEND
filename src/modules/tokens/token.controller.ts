@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { TokenService } from './token.service';
 import { CreateTokenDto } from './dto/create-token.dto';
 import { AssignTokenDto } from './dto/assign-token.dto';
@@ -13,17 +13,26 @@ export class TokenController {
   }
   @UseGuards(JwtAuthGuard)
   @Post('assign')
-  assign(@Body() dto: AssignTokenDto) {
-    return this.tokenService.assignToken(dto);
+  assign(@Body() dto: AssignTokenDto, @Req() req) {
+    const userId = req.user.userId||req.user.id||req.user.sub;
+    return this.tokenService.assignToken(dto, userId);
   }
   @UseGuards(JwtAuthGuard)
   @Delete('unassign/:token')
-  unassign(@Param('token') token: string) {
-    return this.tokenService.unassignToken(token);
+  unassign(@Param('token') token: string, @Req() req) {
+    const userId = req.user.userId||req.user.id||req.user.sub;
+    return this.tokenService.unassignToken(token, userId);
   }
   @UseGuards(JwtAuthGuard)
   @Delete('remove/:token')
   removeInvalid(@Param('token') token: string) {
     return this.tokenService.removeInvalidToken(token);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('send')
+  sendNotification(@Req() req) {
+    const userId = req.user.userId||req.user.id||req.user.sub;
+    return this.tokenService.sendNotification(userId, 'test title', 'test body');
   }
 }

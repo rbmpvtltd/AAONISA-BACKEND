@@ -15,13 +15,15 @@ import { NotificationModule } from '../notifications/notification.module';
 import { UploadService } from '../upload/upload.service';
 import { BlockService } from './block.service';
 import { BlockModule } from './block.module';
+import {TokenModule } from '../tokens/token.module';
 @Module({
   imports: [TypeOrmModule.forFeature([UserProfile,User,Video,Like,View,Follow]),
   AuthModule,
   TypeOrmModule.forFeature([User]),
   OtpModule,
   forwardRef(() => NotificationModule),
-  BlockModule
+  BlockModule,
+  TokenModule
 ],
   providers: [UserService,UploadService,BlockService],
   controllers: [UserController],

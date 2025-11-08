@@ -1,6 +1,33 @@
-import {IsNotEmpty, IsOptional, IsString, IsBoolean } from 'class-validator';
+// import {IsNotEmpty, IsOptional, IsString, IsBoolean } from 'class-validator';
 
-export class UpdateUserProfileDto{
+// export class UpdateUserProfileDto{
+
+//     @IsOptional()
+//     bio: string;
+
+//     @IsString()
+//     @IsOptional()
+//     name: string;
+
+//     @IsOptional()
+//     @IsString()
+//     username?: string;
+
+//     @IsOptional()
+//     @IsString()
+//     url?: string
+
+//     @IsBoolean()
+//     imageChanged: string;
+
+//     @IsOptional()
+//     @IsString()
+//     ProfilePicture?: string
+// }
+
+import { IsNotEmpty, IsOptional, IsString, IsBoolean } from 'class-validator';
+
+export class UpdateUserProfileDto {
 
     @IsOptional()
     bio: string;
@@ -17,7 +44,11 @@ export class UpdateUserProfileDto{
     @IsString()
     url?: string
 
-    @IsBoolean()
+    @IsOptional()
+    @IsString()
     imageChanged: string;
-}
 
+    @IsOptional()
+    @IsString()
+    ProfilePicture?: string;
+}

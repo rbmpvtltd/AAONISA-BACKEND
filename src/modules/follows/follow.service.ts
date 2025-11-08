@@ -13,6 +13,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { lookup } from 'mime-types'
 import * as sharp from 'sharp';
+import { TokenService } from '../tokens/token.service';
 @Injectable()
 export class FollowService {
   constructor(
@@ -24,7 +25,8 @@ export class FollowService {
     @InjectRepository(UserProfile)
     private readonly userProFileRepository: Repository<UserProfile>,
     private readonly gateway: AppGateway,
-    private readonly uploadService: UploadService
+    private readonly uploadService: UploadService,
+    private readonly tokenService: TokenService
   ) { }
   
   async followUser(followerId: string, followingId: string) {
@@ -65,7 +67,7 @@ export class FollowService {
 
     await this.followRepository.save(follow);
     this.gateway.emitToUser(followingId, 'followState', `${follow.follower}`);
-
+    await this.tokenService.sendNotification(followerId, 'Followed', `you followed ${userToFollow.username}`);
     return { message: 'Followed successfully', follow };
   }
 
