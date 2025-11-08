@@ -15,7 +15,7 @@ export class AuthService {
     });
     return { accessToken, refreshToken };
   }
-
+ //verify jwt
   verifyToken(token: string) {
     return this.jwtService.verify(token);
   }
