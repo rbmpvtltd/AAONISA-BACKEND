@@ -9,8 +9,9 @@ import { FollowController } from './follow.controller';
 import { AppGateway } from 'src/app.gateway';
 import { UserProfile } from '../users/entities/user-profile.entity';
 import { UploadService } from '../upload/upload.service';
+import { TokenModule } from '../tokens/token.module';
 @Module({
-  imports: [TypeOrmModule.forFeature([Follow, User,UserProfile])],
+  imports: [TypeOrmModule.forFeature([Follow, User,UserProfile]),TokenModule],
   controllers: [FollowController],
   providers: [FollowService,AppGateway,UploadService],
   exports: [FollowService],

@@ -18,6 +18,7 @@ import { AuthService } from '../auth/auth.service';
 import { OtpService } from '../otp/otp.service';
 import { EmailService } from '../otp/email.service';
 import { SmsService } from '../otp/sms.service';
+import { TokenService } from '../tokens/token.service';
 import { extname } from 'path';
 import { Follow } from '../follows/entities/follow.entity';
 import { Video } from '../stream/entities/video.entity';
@@ -37,7 +38,8 @@ export class UserService {
     private readonly otpService: OtpService,
     private readonly emailService: EmailService,
     private readonly smsService: SmsService,
-    private readonly uploadService: UploadService
+    private readonly uploadService: UploadService,
+    private readonly tokenService: TokenService
   ) { }
 
   async preRegisterCheck(dto: { emailOrPhone: string; username: string }) {
@@ -148,7 +150,6 @@ export class UserService {
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-
     return res.status(200).json({ message: 'Login successful', accessToken: tokens.accessToken, success: true });
   }
 
@@ -207,7 +208,6 @@ export class UserService {
     } else {
       throw new BadRequestException('Invalid email or phone number format');
     }
-    console.log(email, phone_no);
     const user = await this.userRepository.findOne({ where: { email: email, phone_no: phone_no } }); if (!user) throw new NotFoundException('User not found');
 
     const isValid = await this.otpService.validateOtp({
@@ -266,76 +266,150 @@ export class UserService {
   //   return { message: 'OTP sent for verification', success: true };
   // }
 
-  async updateProfile(dto: any, payload: any) {
-    const userId = payload?.sub || payload?.id || payload?.userId;
-    if (!userId) throw new UnauthorizedException('Invalid token');
+  // async updateProfile(dto: any, payload: any) {
+  //   const userId = payload?.sub || payload?.id || payload?.userId;
+  //   if (!userId) throw new UnauthorizedException('Invalid token');
 
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    const userProfile = await this.userProfileRepository.findOne({ where: { user_id: userId } });
+  //   const user = await this.userRepository.findOne({ where: { id: userId } });
+  //   const userProfile = await this.userProfileRepository.findOne({ where: { user_id: userId } });
 
-    if (!user || !userProfile) throw new NotFoundException('User not found');
+  //   if (!user || !userProfile) throw new NotFoundException('User not found');
 
-    const imageChanged = dto.imageChanged === 'true' || dto.imageChanged === true;
+  //   const imageChanged = dto.imageChanged === 'true' || dto.imageChanged === true;
 
-    // ✅ Upload new image
-    if (imageChanged && dto.ProfilePicture) {
-      const base64Str = dto.ProfilePicture.split(';base64,')[1];
-      if (!base64Str) throw new BadRequestException("Invalid base64 image");
+  //   // ✅ Upload new image
+  //   if (imageChanged && dto.ProfilePicture) {
+  //     const base64Str = dto.ProfilePicture.split(';base64,')[1];
+  //     if (!base64Str) throw new BadRequestException("Invalid base64 image");
 
-      const buffer = Buffer.from(base64Str, 'base64');
-      const fileName = `${userId}.jpg`;
+  //     const buffer = Buffer.from(base64Str, 'base64');
+  //     const fileName = `${userId}.jpg`;
 
-      if (userProfile.ProfilePicture) {
-        const oldKey = userProfile.ProfilePicture.split('.com/')[1];
-        if (oldKey) await this.uploadService.deleteFile(oldKey);
-      }
+  //     if (userProfile.ProfilePicture) {
+  //       const oldKey = userProfile.ProfilePicture.split('.com/')[1];
+  //       if (oldKey) await this.uploadService.deleteFile(oldKey);
+  //     }
 
-      const uploaded = await this.uploadService.uploadFile(buffer, "profiles", fileName);
-      userProfile.ProfilePicture = uploaded.publicUrl || uploaded.url;
+  //     const uploaded = await this.uploadService.uploadFile(buffer, "profiles", fileName);
+  //     userProfile.ProfilePicture = uploaded.publicUrl || uploaded.url;
+  //   }
+
+  //   // ✅ Remove image
+  //   if (imageChanged && !dto.ProfilePicture) {
+  //     if (userProfile.ProfilePicture) {
+  //       const oldKey = userProfile.ProfilePicture.split('.com/')[1];
+  //       if (oldKey) await this.uploadService.deleteFile(oldKey);
+  //     }
+  //     userProfile.ProfilePicture = '';
+  //   }
+  //     // ✅ Update profile fields
+  //     userProfile.name = dto.name ?? userProfile.name;
+  //     userProfile.bio = dto.bio ?? userProfile.bio;
+  //     userProfile.url = dto.url ?? userProfile.url;
+
+  //     await this.userProfileRepository.save(userProfile);
+
+  //     // ✅ Update username
+  //     if (dto.username) {
+  //       const existingUser = await this.userRepository.findOne({ where: { username: dto.username } });
+  //       if (existingUser && existingUser.id !== user.id)
+  //         throw new BadRequestException('Username already taken');
+
+  //     }
+
+  //     // ✅ ✅ MOST IMPORTANT: re-fetch updated data
+  //     const updatedUser = await this.userRepository.findOne({
+  //       where: { id: userId },
+  //       relations: ["userProfile"]
+  //     });
+  //     if (!updatedUser) throw new NotFoundException('User not found');
+
+  //     return {
+  //       success: true,
+  //       message: "Profile updated successfully",
+  //       data: {
+  //         username: updatedUser.username,
+  //         name: updatedUser.userProfile.name,
+  //         bio: updatedUser.userProfile.bio,
+  //         url: updatedUser.userProfile.url,
+  //         profilePicture: updatedUser.userProfile.ProfilePicture,
+  //       }
+
+  //     };
+  // }
+
+async updateProfile(dto: UpdateUserProfileDto, payload: any) {
+  const userId = payload?.sub || payload?.id || payload?.userId;
+  if (!userId) throw new UnauthorizedException("Invalid token");
+
+  const user = await this.userRepository.findOne({ where: { id: userId } });
+  const userProfile = await this.userProfileRepository.findOne({ where: { user_id: userId } });
+
+  if (!user || !userProfile) throw new NotFoundException("User not found");
+
+  const imageChanged = dto.imageChanged === 'true'
+
+  // ✅ New image upload
+  if (imageChanged && dto.ProfilePicture) {
+    const base64Str = dto.ProfilePicture.split(";base64,")[1];
+    if (!base64Str) throw new BadRequestException("Invalid base64 image");
+
+    const buffer = Buffer.from(base64Str, "base64");
+    const fileName = `${userId}.jpg`;
+
+    if (userProfile.ProfilePicture) {
+      const oldKey = userProfile.ProfilePicture.split(".com/")[1];
+      if (oldKey) await this.uploadService.deleteFile(oldKey);
     }
 
-    // ✅ Remove image
-    if (imageChanged && !dto.ProfilePicture) {
-      if (userProfile.ProfilePicture) {
-        const oldKey = userProfile.ProfilePicture.split('.com/')[1];
-        if (oldKey) await this.uploadService.deleteFile(oldKey);
-      }
-
-      // ✅ Update profile fields
-      userProfile.name = dto.name ?? userProfile.name;
-      userProfile.bio = dto.bio ?? userProfile.bio;
-      userProfile.url = dto.url ?? userProfile.url;
-
-      await this.userProfileRepository.save(userProfile);
-
-      // ✅ Update username
-      if (dto.username) {
-        const existingUser = await this.userRepository.findOne({ where: { username: dto.username } });
-        if (existingUser && existingUser.id !== user.id)
-          throw new BadRequestException('Username already taken');
-
-      }
-
-      // ✅ ✅ MOST IMPORTANT: re-fetch updated data
-      const updatedUser = await this.userRepository.findOne({
-        where: { id: userId },
-        relations: ["userProfile"]
-      });
-      if (!updatedUser) throw new NotFoundException('User not found');
-
-      return {
-        success: true,
-        message: "Profile updated successfully",
-        data: {
-          username: updatedUser.username,
-          name: updatedUser.userProfile.name,
-          bio: updatedUser.userProfile.bio,
-          url: updatedUser.userProfile.url,
-          profilePicture: updatedUser.userProfile.ProfilePicture,
-        }
-      };
-    }
+    const uploaded = await this.uploadService.uploadFile(buffer, "profiles", fileName);
+    userProfile.ProfilePicture = uploaded.publicUrl || uploaded.url;
   }
+
+  // ✅ Remove image
+  if (imageChanged && !dto.ProfilePicture) {
+    if (userProfile.ProfilePicture) {
+      const oldKey = userProfile.ProfilePicture.split(".com/")[1];
+      if (oldKey) await this.uploadService.deleteFile(oldKey);
+    }
+    userProfile.ProfilePicture = '';
+  }
+
+  // ✅ Update fields
+  userProfile.name = dto.name ?? userProfile.name;
+  userProfile.bio = dto.bio ?? userProfile.bio;
+  userProfile.url = dto.url ?? userProfile.url;
+
+  await this.userProfileRepository.save(userProfile);
+
+  // ✅ Update username
+  if (dto.username) {
+    const exists = await this.userRepository.findOne({ where: { username: dto.username } });
+    if (exists && exists.id !== user.id) throw new BadRequestException("Username already taken");
+
+    user.username = dto.username;
+    await this.userRepository.save(user);
+  }
+
+  // ✅ Fetch updated data
+  const updatedUser = await this.userRepository.findOne({
+    where: { id: userId },
+    relations: ["userProfile"],
+  });
+  if(!updatedUser) throw new NotFoundException('User not found');
+  return {
+    success: true,
+    message: "Profile updated successfully",
+    data: {
+      username: updatedUser.username,
+      name: updatedUser.userProfile.name,
+      bio: updatedUser.userProfile.bio,
+      url: updatedUser.userProfile.url,
+      ProfilePicture: updatedUser.userProfile.ProfilePicture,
+    },
+  };
+}
+
   async allUusersDetails() {
     const users = await this.userRepository.find({ relations: ['userProfile'], });
 
