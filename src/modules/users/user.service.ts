@@ -350,8 +350,8 @@ async updateProfile(dto: UpdateUserProfileDto, payload: any) {
   const imageChanged = dto.imageChanged === 'true'
 
   // ✅ New image upload
-  if (imageChanged && dto.ProfilePicture) {
-    const base64Str = dto.ProfilePicture.split(";base64,")[1];
+  if (imageChanged && dto.profilePicture) {
+    const base64Str = dto.profilePicture.split(";base64,")[1];
     if (!base64Str) throw new BadRequestException("Invalid base64 image");
 
     const buffer = Buffer.from(base64Str, "base64");
@@ -367,7 +367,7 @@ async updateProfile(dto: UpdateUserProfileDto, payload: any) {
   }
 
   // ✅ Remove image
-  if (imageChanged && !dto.ProfilePicture) {
+  if (imageChanged && !dto.profilePicture) {
     if (userProfile.ProfilePicture) {
       const oldKey = userProfile.ProfilePicture.split(".com/")[1];
       if (oldKey) await this.uploadService.deleteFile(oldKey);
@@ -490,6 +490,7 @@ async updateProfile(dto: UpdateUserProfileDto, payload: any) {
       .leftJoinAndSelect('video.likes', 'likes')
       .leftJoinAndSelect('video.views', 'views')
       .where('video.user_id = :userId', { userId })
+      .andWhere('video.type != :type', { type: 'story' })
       .orderBy('video.created_at', 'DESC')
       .getMany();
 

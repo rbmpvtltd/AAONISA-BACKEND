@@ -1,5 +1,5 @@
 import { Multer } from 'multer';
-import { Controller, Post, UploadedFile, UseInterceptors, Body, UseGuards, Req, BadRequestException, Res, Get, Param, } from '@nestjs/common';
+import { Controller, Post, UploadedFile, UseInterceptors, Body, UseGuards, Req, BadRequestException, Res, Get, Param, Query, } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -78,4 +78,25 @@ export class VideoController {
     }
     return this.videoService.getAllStories(user.userId);
   }
+  
+  @Get('feed')
+  @UseGuards(JwtAuthGuard)
+  async getFeed(
+    @Req() req: Request,
+    @Query('type') type: 'followings' | 'news' | 'explore',
+    @Query('page') page: string,
+    @Query('limit') limit: string
+  ) {
+    const user = req.user as { userId?: string };
+    if (!user || !user.userId) {
+      throw new BadRequestException('Invalid or missing user ID in token.');
+    }
+
+    const feedType = type || 'news';
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 10;
+
+    return this.videoService.getVideosFeed(user.userId, feedType, pageNum, limitNum);
+  }
+
 }

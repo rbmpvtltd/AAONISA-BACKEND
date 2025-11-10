@@ -670,56 +670,145 @@ export class VideoService {
     }
 
     async getAllStories(userId: string) {
-  // Logged in user
-  const user = await this.userRepository.findOne({
-    where: { id: userId },
-    relations: ["userProfile", "videos"]
-  });
+        // Logged-in user
+        const user = await this.userRepository.findOne({
+            where: { id: userId },
+            relations: ["userProfile", "videos"]
+        });
 
-  if(!user) throw new NotFoundException('User not found');
-  // User ki khud ki stories
-  const selfStories = user.videos.filter(v => v.type === "story");
+        if (!user) throw new NotFoundException("User not found");
 
-  // Find whom user is following
-  const following = await this.followRepository.find({
-    where: { follower: { id: userId } },
-    relations: ["following", "following.userProfile", "following.videos"]
-  });
+        // Calculate 24-hour cutoff time
+        const cutoffTime = new Date();
+        cutoffTime.setHours(cutoffTime.getHours() - 24);
 
-  // Prepare all story users (self + following)
-  const storyUsers = [
-    {
-      username: user.username,
-      profilePic: user.userProfile?.ProfilePicture || "",
-      owner: user.id,
-      self: true,
-      stories: selfStories.map(story => ({
-        id: story.uuid,
-        videoUrl: story.videoUrl,
-        duration: 15,
-        viewed: false
-      }))
-    },
-    ...following.map(f => {
-      const u = f.following;
-      const userStories = u.videos.filter(v => v.type === "story");
+        // User ki khud ki stories (24h ke andar)
+        const selfStories = user.videos
+            .filter(v => v.type === "story" && new Date(v.created_at) >= cutoffTime)
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      return {
-        username: u.username,
-        profilePic: u.userProfile?.ProfilePicture || "",
-        owner: u.id,
-        self: false,
-        stories: userStories.map(story => ({
-          id: story.uuid,
-          videoUrl: story.videoUrl,
-          duration: 15,
-          viewed: false
-        }))
-      };
-    })
-  ];
+        // Find whom user is following
+        const following = await this.followRepository.find({
+            where: { follower: { id: userId } },
+            relations: ["following", "following.userProfile", "following.videos"]
+        });
 
-  return storyUsers.filter(user => user.stories.length > 0);
-}
+        // Prepare all story users (self + following)
+        const storyUsers = [
+            {
+                username: user.username,
+                profilePic: user.userProfile?.ProfilePicture || "",
+                owner: user.id,
+                self: true,
+                stories: selfStories.map(story => ({
+                    id: story.uuid,
+                    videoUrl: story.videoUrl,
+                    duration: 15,
+                    viewed: false,
+                    created_at: story.created_at
+                }))
+            },
+            ...following.map(f => {
+                const u = f.following;
+                const userStories = u.videos
+                    .filter(v => v.type === "story" && new Date(v.created_at) >= cutoffTime)
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+                return {
+                    username: u.username,
+                    profilePic: u.userProfile?.ProfilePicture || "",
+                    owner: u.id,
+                    self: false,
+                    stories: userStories.map(story => ({
+                        id: story.uuid,
+                        videoUrl: story.videoUrl,
+                        duration: 15,
+                        viewed: false,
+                        created_at: story.created_at
+                    }))
+                };
+            })
+        ];
+
+        // Filter out users with no valid stories
+        const validUsers = storyUsers.filter(user => user.stories.length > 0);
+
+        // Sort users by latest story time (newest first)
+        validUsers.sort((a, b) => {
+            const latestA = Math.max(...a.stories.map(s => new Date(s.created_at).getTime()));
+            const latestB = Math.max(...b.stories.map(s => new Date(s.created_at).getTime()));
+            return latestB - latestA;
+        });
+
+        return validUsers;
+    }
+
+    async getVideosFeed(
+        userId: string,
+        feedType: 'followings' | 'news' | 'explore',
+        page = 1,
+        limit = 10
+    ) {
+        const skip = (page - 1) * limit;
+        const query = this.videoRepository
+            .createQueryBuilder('video')
+            .leftJoinAndSelect('video.user_id', 'user')
+            .leftJoinAndSelect('user.userProfile', 'userProfile')
+            .leftJoinAndSelect('video.audio', 'audio')
+            .leftJoinAndSelect('video.hashtags', 'hashtags')
+            .leftJoinAndSelect('video.likes', 'likes')
+            .leftJoinAndSelect('video.views', 'views')
+            .where('video.type != :storyType', { storyType: 'story' });
+        if (feedType === 'followings') {
+            const followings = await this.followRepository.find({
+                where: { follower: { id: userId } },
+                relations: ['following'],
+            });
+
+            const followingIds = followings.map(f => f.following.id);
+
+            if (followingIds.length === 0) {
+                return { data: [], page, limit, total: 0 };
+            }
+
+            query.andWhere('video.user_id IN (:...followingIds)', { followingIds });
+            query.orderBy('video.created_at', 'DESC');
+        }
+        else if (feedType === 'news') {
+            query.andWhere('video.type = :newsType', { newsType: 'news' });
+            query.orderBy('video.created_at', 'DESC');
+        }
+        else if (feedType === 'explore') {
+            query.andWhere('video.type = :reelsType', { reelsType: 'reels' });
+            query.orderBy('RANDOM()');
+        }
+        query.skip(skip).take(limit);
+        const [videos, total] = await query.getManyAndCount();
+        const formatted = videos.map(v => ({
+            id: v.uuid,
+            title: v.title,
+            caption: v.caption,
+            videoUrl: v.videoUrl,
+            type: v.type,
+            created_at: v.created_at,
+            user: {
+                id: v.user_id.id,
+                username: v.user_id.username,
+                profilePic: v.user_id.userProfile?.ProfilePicture || '',
+            },
+            audio: v.audio ? { id: v.audio.uuid, title: v.audio.name } : null,
+            hashtags: v.hashtags?.map(h => h.tag) || [],
+            likesCount: v.likes?.length || 0,
+            viewsCount: v.views?.length || 0,
+        }));
+
+        return {
+            data: formatted,
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+        };
+    }
 
 }

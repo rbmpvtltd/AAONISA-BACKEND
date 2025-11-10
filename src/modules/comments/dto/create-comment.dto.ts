@@ -14,5 +14,5 @@ export class CreateCommentDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  mentions?: string[]; // user IDs mentioned
+  mentions?: string[];
 }

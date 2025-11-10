@@ -115,8 +115,10 @@ export class CommentService {
                 'author',
                 'replies',
                 'replies.author',
+                'replies.author.userProfile',
                 'mentions',
                 'post',
+                'author.userProfile',
             ],
             order: { createdAt: 'ASC' },
         });
