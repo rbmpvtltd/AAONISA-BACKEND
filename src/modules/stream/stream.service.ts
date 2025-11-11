@@ -779,8 +779,8 @@ export class VideoService {
             query.orderBy('video.created_at', 'DESC');
         }
         else if (feedType === 'explore') {
-            query.andWhere('video.type = :reelsType', { reelsType: 'reels' });
-            query.orderBy('RANDOM()');
+            query.andWhere('(video.type = :reelsType OR video.type = :newsType)', { reelsType: 'reels', newsType: 'news' });
+            // query.orderBy('RANDOM()');
         }
         query.skip(skip).take(limit);
         const [videos, total] = await query.getManyAndCount();
