@@ -105,7 +105,17 @@ export class CommentService {
                 }
             );
         }
-        return this.commentRepository.save(comment);
+        const saved = await this.commentRepository.save(comment);
+
+        // ✅ Re-fetch full comment with author, reel, replies, etc.
+        const populated = await this.commentRepository.findOne({
+            where: { id: saved.id },
+            relations: ['author', 'reel', 'replies', 'mentions', 'likedBy', 'parent'],
+        });
+
+        // ✅ Return plain JSON so frontend doesn’t crash
+        return populated;
+        ;
     }
 
     async findByPost(postId: string) {
@@ -117,7 +127,7 @@ export class CommentService {
                 'replies.author',
                 'replies.author.userProfile',
                 'mentions',
-                'post',
+                'reel',
                 'author.userProfile',
             ],
             order: { createdAt: 'ASC' },
