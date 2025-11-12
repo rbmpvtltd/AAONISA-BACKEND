@@ -28,7 +28,7 @@ export class FollowService {
     private readonly uploadService: UploadService,
     private readonly tokenService: TokenService
   ) { }
-  
+
   async followUser(followerId: string, followingId: string) {
     if (followerId === followingId) {
       throw new BadRequestException("You can't follow yourself");
@@ -66,8 +66,17 @@ export class FollowService {
     });
 
     await this.followRepository.save(follow);
-    this.gateway.emitToUser(followingId, 'followState', `${follow.follower}`);
-    await this.tokenService.sendNotification(followerId, 'Followed', `you followed ${userToFollow.username}`);
+    // this.gateway.emitToUser(followingId, 'followState', `${follow.follower}`);
+    try {
+      await this.tokenService.sendNotification(
+        followingId,
+        'Followed',
+        `${userWhoFollow.username} followed you`
+      );
+    } catch (err) {
+      console.warn('Notification failed:', err.message);
+    }
+    // await this.tokenService.sendNotification(followerId, 'Followed', `you followed ${userToFollow.username}`);
     return { message: 'Followed successfully', follow };
   }
 
@@ -114,87 +123,87 @@ export class FollowService {
   //     followings: followings.map(f => f.following.username),
   //   };
   // }
-  
+
   async getFollowState(userId: string) {
-  const user = await this.userRepository.findOne({
-    where: { id: userId },
-    relations: ['likes', 'views', 'videos'],
-  });
-  if (!user) throw new Error("User not found");
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['likes', 'views', 'videos'],
+    });
+    if (!user) throw new Error("User not found");
 
-  // Followers
-  const followers = await this.followRepository
-    .createQueryBuilder("follows")
-    .leftJoin(UserProfile, "user_profile", `"user_profile"."user_id"::uuid = "follows"."followerId"`)
-    .leftJoin(User, "user", `"user"."id" = "follows"."followerId"`)
-    .select([
-      `"follows"."followerId" AS id`,
-      `"user"."username" AS username`,
-      `"user_profile"."name" AS name`,
-      `"user_profile"."ProfilePicture" AS userProfilePicture`
-    ])
-    .where(`"follows"."followingId"::uuid = :userId`, { userId })
-    .getRawMany();
+    // Followers
+    const followers = await this.followRepository
+      .createQueryBuilder("follows")
+      .leftJoin(UserProfile, "user_profile", `"user_profile"."user_id"::uuid = "follows"."followerId"`)
+      .leftJoin(User, "user", `"user"."id" = "follows"."followerId"`)
+      .select([
+        `"follows"."followerId" AS id`,
+        `"user"."username" AS username`,
+        `"user_profile"."name" AS name`,
+        `"user_profile"."ProfilePicture" AS userProfilePicture`
+      ])
+      .where(`"follows"."followingId"::uuid = :userId`, { userId })
+      .getRawMany();
 
-  // Followings
-  const followings = await this.followRepository
-    .createQueryBuilder("follows")
-    .leftJoin(UserProfile, "user_profile", `"user_profile"."user_id"::uuid = "follows"."followingId"`)
-    .leftJoin(User, "user", `"user"."id" = "follows"."followingId"`)
-    .select([
-      `"follows"."followingId" AS id`,
-      `"user"."username" AS username`,
-      `"user_profile"."name" AS name`,
-      `"user_profile"."ProfilePicture" AS userProfilePicture`
-    ])
-    .where(`"follows"."followerId"::uuid = :userId`, { userId })
-    .getRawMany();
+    // Followings
+    const followings = await this.followRepository
+      .createQueryBuilder("follows")
+      .leftJoin(UserProfile, "user_profile", `"user_profile"."user_id"::uuid = "follows"."followingId"`)
+      .leftJoin(User, "user", `"user"."id" = "follows"."followingId"`)
+      .select([
+        `"follows"."followingId" AS id`,
+        `"user"."username" AS username`,
+        `"user_profile"."name" AS name`,
+        `"user_profile"."ProfilePicture" AS userProfilePicture`
+      ])
+      .where(`"follows"."followerId"::uuid = :userId`, { userId })
+      .getRawMany();
 
-  // Helper to generate signed URL
-  const toSignedUrl = async (path: string | null): Promise<string | null> => {
-    if (!path) return null;
-    const key = path.split('/').pop();
-    if (!key) return null;
-    const bucket = 'profiles';
-    const fullKey = `${bucket}/${key}`;
-    try {
-      return await this.uploadService.getFileUrl(fullKey, 3600); // valid 1 hour
-    } catch (err) {
-      console.error('Failed to generate signed URL:', err);
-      return null;
-    }
-  };
+    // Helper to generate signed URL
+    const toSignedUrl = async (path: string | null): Promise<string | null> => {
+      if (!path) return null;
+      const key = path.split('/').pop();
+      if (!key) return null;
+      const bucket = 'profiles';
+      const fullKey = `${bucket}/${key}`;
+      try {
+        return await this.uploadService.getFileUrl(fullKey, 3600); // valid 1 hour
+      } catch (err) {
+        console.error('Failed to generate signed URL:', err);
+        return null;
+      }
+    };
 
-  // Followers with signed URLs
-  const followersWithUrls = await Promise.all(
-    followers.map(async f => ({
-      ...f,
-      userProfilePicture: await toSignedUrl(f.userprofilepicture)
-    }))
-  );
+    // Followers with signed URLs
+    const followersWithUrls = await Promise.all(
+      followers.map(async f => ({
+        ...f,
+        userProfilePicture: await toSignedUrl(f.userprofilepicture)
+      }))
+    );
 
-  // Followings with signed URLs
-  const followingsWithUrls = await Promise.all(
-    followings.map(async f => ({
-      ...f,
-      userProfilePicture: await toSignedUrl(f.userprofilepicture)
-    }))
-  );
+    // Followings with signed URLs
+    const followingsWithUrls = await Promise.all(
+      followings.map(async f => ({
+        ...f,
+        userProfilePicture: await toSignedUrl(f.userprofilepicture)
+      }))
+    );
 
-  // User's own profile picture
-  const userProfileInfo = await this.userProFileRepository.findOneBy({ user_id: userId });
-  const profilePictureSignedUrl = await toSignedUrl(userProfileInfo?.ProfilePicture || null);
+    // User's own profile picture
+    const userProfileInfo = await this.userProFileRepository.findOneBy({ user_id: userId });
+    const profilePictureSignedUrl = await toSignedUrl(userProfileInfo?.ProfilePicture || null);
 
-  return {
-    userInfo: user,
-    userProfileInfo: {
-      ...userProfileInfo,
-      ProfilePicture: profilePictureSignedUrl
-    },
-    followers: followersWithUrls,
-    followings: followingsWithUrls,
-  };
-}
+    return {
+      userInfo: user,
+      userProfileInfo: {
+        ...userProfileInfo,
+        ProfilePicture: profilePictureSignedUrl
+      },
+      followers: followersWithUrls,
+      followings: followingsWithUrls,
+    };
+  }
 
-  
+
 }

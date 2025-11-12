@@ -87,13 +87,17 @@ export class VideoService {
         );
         return new Promise((resolve, reject) => {
             ffmpeg(filePath)
-                .outputOptions('-y') // overwrite existing file
+                .outputOptions('-y')
+                .outputOptions('-movflags +faststart')     // ✅ instant playback
+                .outputOptions('-preset veryfast')         // ✅ quick compression
+                .outputOptions('-tune fastdecode')         // ✅ optimized for playback
+                .outputOptions('-crf 23')                  // ✅ balanced quality-size ratio
                 .videoCodec('libx264')
-                .size('720x1280')      // 9:16 ratio
-                .videoBitrate('3000k') // 3 Mbps
-                .fps(30)               // frame rate
-                .audioCodec('aac')     // copy audio
-                .output(compressedPath)      // overwrite same file
+                .size('720x1280')
+                .videoBitrate('2500k')
+                .fps(30)
+                .audioCodec('aac')
+                .output(compressedPath)
                 .on('end', () => {
                     console.log('✅ Compression completed and overwritten:', compressedPath);
                     resolve(compressedPath);
@@ -291,7 +295,11 @@ export class VideoService {
 
                 command
                     .complexFilter(filterComplex, finalOutput)
-                    .outputOptions('-preset veryfast')
+                    .outputOptions('-movflags +faststart')     // ✅ instant playback
+                    .outputOptions('-preset veryfast')         // ✅ quick compression
+                    .outputOptions('-tune fastdecode')         // ✅ optimized for playback
+                    .outputOptions('-crf 23')                  // ✅ balanced quality-size ratio
+
                     .save(safeOutput)
                     .on('start', cmd => console.log('🎬 FFmpeg command:', cmd))
                     .on('end', () => {
@@ -395,6 +403,27 @@ export class VideoService {
     //     });
     // }
 
+    private async generateThumbnail(videoPath: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const thumbnailDir = path.join(process.cwd(), 'src', 'uploads', 'thumbnails');
+            if (!fs.existsSync(thumbnailDir)) {
+                fs.mkdirSync(thumbnailDir, { recursive: true });
+            }
+
+            const thumbnailFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
+            const thumbnailPath = path.join(thumbnailDir, thumbnailFilename);
+
+            ffmpeg(videoPath)
+                .on('end', () => resolve(thumbnailPath))
+                .on('error', (err) => reject(err))
+                .screenshots({
+                    timestamps: ['00:00:01'], // 1 second mark (or '0' for first frame)
+                    filename: thumbnailFilename,
+                    folder: thumbnailDir,
+                    size: '640x?'
+                });
+        });
+    }
 
 
     async create(createVideoDto: CreateVideoDto, filename: string, userId: string) {
@@ -528,11 +557,19 @@ export class VideoService {
         } else {
             uploadPath = await this.uploadService.uploadFile(compressedPath, createVideoDto.type == VideoType.reels ? 'reels' : 'news');
         }
-
-        // Replace original with processed version
+        let thumbnailPublicUrl = '';
+        try {
+            const thumbnailPath = await this.generateThumbnail(compressedPath);
+            const uploadedThumb = await this.uploadService.uploadFile(thumbnailPath, 'thumbnails');
+            thumbnailPublicUrl = uploadedThumb.publicUrl;
+            fs.unlinkSync(thumbnailPath);
+        } catch (err) {
+            console.warn('Thumbnail generation failed:', err.message);
+        }   
         fs.unlinkSync(videoPath);
         fs.unlinkSync(compressedPath);
         filename = processedFilename;
+        
 
         // ---------------- CREATE VIDEO ----------------
         const video = this.videoRepository.create({
@@ -545,6 +582,7 @@ export class VideoService {
             audio: audio || null,
             videoUrl: uploadPath.publicUrl,
             mentions: mentionedUsers,
+            thumbnailUrl: thumbnailPublicUrl,
         });
 
         await this.videoRepository.save(video);
