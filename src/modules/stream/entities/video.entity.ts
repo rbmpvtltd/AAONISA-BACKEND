@@ -40,6 +40,10 @@ export class Video {
   @Column()
   videoUrl: string;
 
+  @Column({ type: 'text', nullable: true })
+  @IsOptional()
+  thumbnailUrl?: string | null;
+
   @Column({ nullable: true })
   @IsOptional()
   externalAudioSrc: string;
@@ -83,7 +87,6 @@ export class Video {
   @ManyToMany(() => Bookmark, (bookmark) => bookmark.reels)
   bookmarks: Bookmark[];
 
-  
   @OneToMany(() => Comment, (comment) => comment.reel, {
     cascade: true,
     onDelete: 'CASCADE',
