@@ -849,4 +849,69 @@ export class VideoService {
         };
     }
 
+    async getExploreVideosWithMain(
+    videoId: string,
+    limit = 10
+) {
+    // Fetch the main video first
+    const mainVideo = await this.videoRepository
+        .createQueryBuilder('video')
+        .leftJoinAndSelect('video.user_id', 'user')
+        .leftJoinAndSelect('user.userProfile', 'userProfile')
+        .leftJoinAndSelect('video.audio', 'audio')
+        .leftJoinAndSelect('video.hashtags', 'hashtags')
+        .leftJoinAndSelect('video.likes', 'likes')
+        .leftJoinAndSelect('video.views', 'views')
+        .where('video.uuid = :videoId', { videoId })
+        .andWhere('video.type IN (:...types)', { types: ['reels', 'news'] })
+        .getOne();
+
+    if (!mainVideo) {
+        return { data: [], total: 0 };
+    }
+
+    // Now fetch 9 random explore videos excluding the main one
+    const otherVideosQuery = this.videoRepository
+        .createQueryBuilder('video')
+        .leftJoinAndSelect('video.user_id', 'user')
+        .leftJoinAndSelect('user.userProfile', 'userProfile')
+        .leftJoinAndSelect('video.audio', 'audio')
+        .leftJoinAndSelect('video.hashtags', 'hashtags')
+        .leftJoinAndSelect('video.likes', 'likes')
+        .leftJoinAndSelect('video.views', 'views')
+        .where('video.type IN (:...types)', { types: ['reels', 'news'] })
+        .andWhere('video.uuid != :videoId', { videoId })
+        .orderBy('RANDOM()')
+        .take(limit - 1);
+
+    const otherVideos = await otherVideosQuery.getMany();
+
+    // Combine main + others
+    const videos = [mainVideo, ...otherVideos];
+
+    // Format output same as before
+    const formatted = videos.map(v => ({
+        id: v.uuid,
+        title: v.title,
+        caption: v.caption,
+        videoUrl: v.videoUrl,
+        type: v.type,
+        created_at: v.created_at,
+        user: {
+            id: v.user_id.id,
+            username: v.user_id.username,
+            profilePic: v.user_id.userProfile?.ProfilePicture || '',
+        },
+        audio: v.audio ? { id: v.audio.uuid, title: v.audio.name } : null,
+        hashtags: v.hashtags?.map(h => h.tag) || [],
+        likesCount: v.likes?.length || 0,
+        viewsCount: v.views?.length || 0,
+    }));
+
+    return {
+        data: formatted,
+        total: formatted.length,
+    };
+}
+
 }

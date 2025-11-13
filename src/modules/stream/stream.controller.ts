@@ -72,13 +72,13 @@ export class VideoController {
   @Get('getAllStories')
   @UseGuards(JwtAuthGuard)
   async getAllStories(@Req() req) {
-     const user = req.user as { userId?: string }
+    const user = req.user as { userId?: string }
     if (!user || !user.userId) {
       throw new BadRequestException('Invalid or missing user ID in token.');
     }
     return this.videoService.getAllStories(user.userId);
   }
-  
+
   @Get('feed')
   @UseGuards(JwtAuthGuard)
   async getFeed(
@@ -99,4 +99,19 @@ export class VideoController {
     return this.videoService.getVideosFeed(user.userId, feedType, pageNum, limitNum);
   }
 
+  @Get('explore/:id')
+  @UseGuards(JwtAuthGuard)
+  async getExploreVideos(
+    @Param('id') videoId: string,
+    @Query('limit') limit: string,
+    @Req() req: Request,
+  ) {
+    const user = req.user as { userId?: string };
+    if (!user || !user.userId) {
+      throw new BadRequestException('Invalid or missing user ID in token.');
+    }
+
+    const limitNum = parseInt(limit, 10) || 10;
+    return this.videoService.getExploreVideosWithMain(videoId, limitNum);
+  }
 }
