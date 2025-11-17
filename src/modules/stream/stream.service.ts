@@ -830,6 +830,7 @@ export class VideoService {
             videoUrl: v.videoUrl,
             type: v.type,
             created_at: v.created_at,
+            thumbnailUrl: v.thumbnailUrl,
             user: {
                 id: v.user_id.id,
                 username: v.user_id.username,
@@ -899,6 +900,7 @@ export class VideoService {
             videoUrl: v.videoUrl,
             type: v.type,
             created_at: v.created_at,
+            thumbnailUrl: v.thumbnailUrl, 
             user: {
                 id: v.user_id.id,
                 username: v.user_id.username,
@@ -909,7 +911,6 @@ export class VideoService {
             likesCount: v.likes?.length || 0,
             viewsCount: v.views?.length || 0,
         }));
-
         return {
             data: formatted,
             total: formatted.length,
