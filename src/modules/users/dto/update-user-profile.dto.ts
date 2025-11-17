@@ -49,6 +49,6 @@ export class UpdateUserProfileDto {
     imageChanged: string;
 
     @IsOptional()
-    @IsString()
+    @IsString() 
     ProfilePicture?: string;
 }
