@@ -362,7 +362,14 @@ export class UserService {
         if (oldKey) await this.uploadService.deleteFile(oldKey);
       }
 
-      const uploaded = await this.uploadService.uploadFile(buffer, "profiles", fileName);
+      // const uploaded = await this.uploadService.uploadFile(buffer, "profiles", fileName);
+      const uploaded = await this.uploadService.uploadFile(
+        buffer,
+        "profiles",
+        fileName,
+        "public, max-age=0, must-revalidate"
+      );
+
       userProfile.ProfilePicture = uploaded.publicUrl || uploaded.url;
     }
 
