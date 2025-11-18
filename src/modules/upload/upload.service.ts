@@ -114,7 +114,7 @@ import * as mime from 'mime-types';
 @Injectable()
 export class UploadService {
     private s3: S3Client;
-    private bucket = 'ans';
+    private bucket = 'ans-v2';
 
     constructor() {
         this.s3 = new S3Client({
