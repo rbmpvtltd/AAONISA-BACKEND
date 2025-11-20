@@ -18,6 +18,8 @@ import { Comment } from '../../comments/entities/comment.entity';
 import { TokenEntity } from 'src/modules/tokens/entities/token.entity';
 import { is } from 'drizzle-orm';
 import { IsOptional } from 'class-validator';
+import { ChatSession } from 'src/modules/chat/entities/chat-session.entity';
+import { Chat } from 'src/modules/chat/entities/chat.entity';
 export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
@@ -59,7 +61,7 @@ export class User {
 
   // ----------------- RELATIONS -----------------
 
-@OneToOne(() => UserProfile, profile => profile.user)
+  @OneToOne(() => UserProfile, profile => profile.user)
   userProfile: UserProfile;  // ✅ correct property name
 
 
@@ -96,5 +98,15 @@ export class User {
 
   @IsOptional()
   @OneToMany(() => TokenEntity, (token) => token.user)
-  tokens?: TokenEntity[]
+  tokens?: TokenEntity[];
+
+  @OneToMany(() => ChatSession, (session) => session.user1)
+  chatSessions1: ChatSession[];
+
+  @OneToMany(() => ChatSession, (session) => session.user2)
+  chatSessions2: ChatSession[];
+
+  @OneToMany(() => Chat, (chat) => chat.sender)
+  messagesSent: Chat[];
+
 }
