@@ -48,7 +48,7 @@ import { ChatModule } from './modules/chat/chat.module';
   ],
   controllers: [],
   providers: [AppGateway],
-  exports: [AppGateway],  // ✅ add this
+  exports: [AppGateway],
 
 })
 
