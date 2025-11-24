@@ -52,12 +52,17 @@ import {
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
 } from '@nestjs/websockets';
+import { log } from 'console';
 import { Server, Socket } from 'socket.io';
 
 @WebSocketGateway({
   cors: { origin: '*' },
   namespace: '/socket.io',
+  // namespace: '/'
 })
 
 export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -89,9 +94,34 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (socketId) {
       this.server.to(socketId).emit(event, data);
     }
+    console.log(data);
+
+  }
+
+  // JOIN ROOM
+  @SubscribeMessage("joinRoom")
+  handleJoinRoom(
+    @MessageBody() data: { roomId: string },
+    @ConnectedSocket() client: Socket
+  ) {
+    const roomId = data.roomId;
+    console.log("User joining room:", roomId);
+    client.join(roomId);
+  }
+
+  @SubscribeMessage("sendMessage")
+  handleSendMessage(
+    @MessageBody() msg: any,
+    @ConnectedSocket() client: Socket
+  ) {
+    const roomId = [msg.senderId, msg.receiverId].sort().join("-");
+
+    console.log("📤 Sending to room:", roomId, msg);
+    this.server.to(roomId).emit("Message", msg);
   }
 
   broadcast(event: string, data: any) {
+    
     this.server.emit(event, data);
   }
 }
