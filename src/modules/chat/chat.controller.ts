@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Param, Body, UseGuards, Req, Query } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Param, Body, UseGuards, Req, Query, HttpStatus, HttpCode, BadRequestException } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { ChatSessionCreateDto } from './dto/chat-session-create.dto';
 import { ChatCreateDto } from './dto/chat-create.dto';
@@ -8,7 +8,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 @Controller('chat')
 @UseGuards(JwtAuthGuard)
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(private readonly chatService: ChatService) { }
 
   // ---------------- ChatSession Endpoints ----------------
 
@@ -21,13 +21,16 @@ export class ChatController {
   }
 
   // Get all sessions of logged-in user with latest message
-  @Get('sessions')
+  @Get('get-all-sessions')
   getSessions(@Req() req) {
     const payload = req.user;
     const userId = payload?.sub || payload?.id || payload?.userId;
     return this.chatService.getUserSessionsWithLatestMessage(userId);
   }
 
+
+
+  
   // Delete a chat session
   @Delete('sessions/:id')
   deleteSession(@Param('id') sessionId: number, @Req() req) {
@@ -55,11 +58,44 @@ export class ChatController {
     return this.chatService.getSessionMessages(sessionId, limit);
   }
 
-  // Delete a message
-  @Delete('messages/:id')
-  deleteMessage(@Param('id') chatId: number, @Req() req) {
-    const payload = req.user;
-    const userId = payload?.sub || payload?.id || payload?.userId;
-    return this.chatService.deleteMessage(userId, chatId);
+  
+@Delete('message/:messageId/for-me')
+@HttpCode(HttpStatus.OK)
+async deleteMessageForMe(
+  @Param('messageId') messageId: string,
+  @Req() req: any,
+) {
+  const userId = req.user.id;
+  
+  // ✅ Validate messageId is a number
+  if (isNaN(parseInt(messageId))) {
+    throw new BadRequestException('Invalid message ID format');
   }
+  
+  return this.chatService.deleteMessageForMe(userId, messageId);
+}
+
+@Delete('message/:messageId/for-everyone')
+@HttpCode(HttpStatus.OK)
+async deleteMessageForEveryone(
+  @Param('messageId') messageId: string,
+  @Req() req: any,
+) {
+  const userId = req.user.id;
+  
+  // ✅ Validate messageId is a number
+  if (isNaN(parseInt(messageId))) {
+    throw new BadRequestException('Invalid message ID format');
+  }
+  
+  return this.chatService.deleteMessageForEveryone(userId, messageId);
+}
+
+  // // Delete a message
+  // @Delete('messages/:id')
+  // deleteMessage(@Param('id') messageId: number, @Req() req) {
+  //   const payload = req.user;
+  //   const userId = payload?.sub || payload?.id || payload?.userId;
+  //   return this.chatService.deleteMessageForEveryone(userId, messageId);
+  // }
 }
