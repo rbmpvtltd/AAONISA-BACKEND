@@ -23,5 +23,10 @@ export class Chat {
   message_text: string;
 
   @CreateDateColumn()
-  created_at: Date;
+  created_at: Date; 
+
+  // ✅ NEW: Track who deleted this message
+  @Column({ type: 'json', nullable: true })
+  deleted_for: string[]; // Array of user IDs who deleted this message for themselves
 }
+
