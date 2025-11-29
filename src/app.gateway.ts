@@ -110,68 +110,76 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.join(roomId);
   }
 
-
+  @SubscribeMessage("leaveRoom")
+  handleLeaveRoom(
+    @MessageBody() data: { roomId: string },
+    @ConnectedSocket() client: Socket
+  ) {
+    const roomId = data.roomId;
+    console.log("🔴 User leaving room:", roomId);
+    client.leave(roomId);
+  }
   @SubscribeMessage("sendMessage")
-async handleSendMessage(
-  @MessageBody() msg: { sessionId: number; senderId: string; receiverId: string; text: string },
-  @ConnectedSocket() client: Socket
-) {
-  const roomId = [msg.senderId, msg.receiverId].sort().join("-");
+  async handleSendMessage(
+    @MessageBody() msg: { sessionId: number; senderId: string; receiverId: string; text: string },
+    @ConnectedSocket() client: Socket
+  ) {
+    const roomId = [msg.senderId, msg.receiverId].sort().join("-");
 
-  console.log("📤 Sending to room:", roomId, msg);
+    console.log("📤 Sending to room:", roomId, msg);
 
-  // Save to DB
-  const saved = await this.chatService.sendMessage(
-    msg.senderId,
-    msg.sessionId,
-    msg.text
-  );
-
-  // ✅ Emit with the REAL DB message_id
-  this.server.to(roomId).emit("Message", {
-    message_id: saved.chat_id,        // This is the real DB ID
-    text: saved.message_text,
-    senderId: msg.senderId,
-    receiverId: msg.receiverId,
-    createdAt: saved.created_at,
-  });
-}
-
-
-@SubscribeMessage('getPreviousMessages')
-async handleGetPreviousMessages(
-  @MessageBody() data: { user1Id: string; user2Id: string },
-  @ConnectedSocket() client: Socket
-) {
-  try {
-    const { user1Id, user2Id } = data;
-
-    console.log('📥 Fetching for User1:', user1Id, 'User2:', user2Id);
-
-    const session = await this.chatService.createSession(user1Id, user2Id);
-
-    // ✅ CRITICAL: Make sure getSessionMessages includes sender relation
-    const messages = await this.chatService.getSessionMessages(
-      session.session_id
+    // Save to DB
+    const saved = await this.chatService.sendMessage(
+      msg.senderId,
+      msg.sessionId,
+      msg.text
     );
 
-    console.log('📦 Found messages:', messages.length);
-    console.log('📦 First message sample:', messages[0]); // Debug log
-
-    const roomId = [user1Id, user2Id].sort().join("-");
-
-    // ✅ Send messages to the room
-    this.server.to(roomId).emit("previousMessages", {
-      sessionId: session.session_id,
-      messages  // This should contain the messages array
+    // ✅ Emit with the REAL DB message_id
+    this.server.to(roomId).emit("Message", {
+      message_id: saved.chat_id,        // This is the real DB ID
+      text: saved.message_text,
+      senderId: msg.senderId,
+      receiverId: msg.receiverId,
+      createdAt: saved.created_at,
     });
-
-    console.log(`📜 Sent ${messages.length} messages to room ${roomId}`);
-  } catch (error) {
-    console.error('❌ Error fetching previous messages:', error);
-    console.error('❌ Error stack:', error.stack);
   }
-}
+
+
+  @SubscribeMessage('getPreviousMessages')
+  async handleGetPreviousMessages(
+    @MessageBody() data: { user1Id: string; user2Id: string },
+    @ConnectedSocket() client: Socket
+  ) {
+    try {
+      const { user1Id, user2Id } = data;
+
+      console.log('📥 Fetching for User1:', user1Id, 'User2:', user2Id);
+
+      const session = await this.chatService.createSession(user1Id, user2Id);
+
+      // ✅ CRITICAL: Make sure getSessionMessages includes sender relation
+      const messages = await this.chatService.getSessionMessages(
+        session.session_id
+      );
+
+      console.log('📦 Found messages:', messages.length);
+      console.log('📦 First message sample:', messages[0]); // Debug log
+
+      const roomId = [user1Id, user2Id].sort().join("-");
+
+      // ✅ Send messages to the room
+      this.server.to(roomId).emit("previousMessages", {
+        sessionId: session.session_id,
+        messages  // This should contain the messages array
+      });
+
+      console.log(`📜 Sent ${messages.length} messages to room ${roomId}`);
+    } catch (error) {
+      console.error('❌ Error fetching previous messages:', error);
+      console.error('❌ Error stack:', error.stack);
+    }
+  }
 
   @SubscribeMessage("deleteMessageForMe")
   async handleDeleteForMe(
