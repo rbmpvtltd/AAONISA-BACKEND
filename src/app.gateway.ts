@@ -74,19 +74,54 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // clientId → rooms joined
   private clientRooms: Map<string, Set<string>> = new Map();
 
-  handleConnection(client: Socket) {
-    const userId = client.handshake.query.userId as string;
-    console.log(`Client connected: ${client.id} (userId: ${userId})`);
+  // handleConnection(client: Socket) {
+  //   const userId = client.handshake.query.userId as string;
+  //   console.log(`Client connected: ${client.id} (userId: ${userId})`);
 
-    if (userId) {
-      this.users.set(userId, client.id);
+  //   if (userId) {
+  //     this.users.set(userId, client.id);
+  //   }
+
+  //   // Initialize room set for this client
+  //   if (!this.clientRooms.has(client.id)) {
+  //     this.clientRooms.set(client.id, new Set());
+  //   }
+  // }
+
+  async handleConnection(client: Socket) {
+  const userId = client.handshake.query.userId as string;
+
+  console.log(`Client connected: ${client.id} (userId: ${userId})`);
+
+  if (userId) {
+    // Check if this user already has an active socket
+    const oldSocketId = this.users.get(userId);
+
+    if (oldSocketId && oldSocketId !== client.id) {
+      try {
+        // Fetch all connected sockets
+        const sockets = await this.server.fetchSockets();
+        const oldSocket = sockets.find(s => s.id === oldSocketId);
+
+        if (oldSocket) {
+          console.log(`⚠ Disconnecting old socket for user ${userId}`);
+          oldSocket.disconnect(true); // force disconnect
+        }
+      } catch (error) {
+        console.error(`❌ Error disconnecting old socket for user ${userId}:`, error);
+      }
     }
 
-    // Initialize room set for this client
-    if (!this.clientRooms.has(client.id)) {
-      this.clientRooms.set(client.id, new Set());
-    }
+    // Save new socket
+    this.users.set(userId, client.id);
   }
+
+  // Initialize rooms set for this client
+  if (!this.clientRooms.has(client.id)) {
+    this.clientRooms.set(client.id, new Set());
+  }
+}
+
 
   handleDisconnect(client: Socket) {
     console.log(`Client disconnected: ${client.id}`);
@@ -165,29 +200,60 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  // @SubscribeMessage("getPreviousMessages")
+  // async handleGetPreviousMessages(
+  //   @MessageBody() data: { user1Id: string; user2Id: string },
+  //   @ConnectedSocket() client: Socket
+  // ) {
+  //   try {
+  //     const { user1Id, user2Id } = data;
+  //     console.log("📥 Fetching previous messages for:", user1Id, user2Id);
+
+  //     const session = await this.chatService.createSession(user1Id, user2Id);
+  //     const messages = await this.chatService.getSessionMessages(session.session_id);
+
+  //     // Emit **only to requesting client** to prevent multiple emits
+  //     client.emit("previousMessages", {
+  //       sessionId: session.session_id,
+  //       messages,
+  //     });
+
+  //     console.log(`📜 Sent ${messages.length} previous messages to client ${client.id}`);
+  //   } catch (error) {
+  //     console.error("❌ Error fetching previous messages:", error);
+  //   }
+  // }
+
   @SubscribeMessage("getPreviousMessages")
-  async handleGetPreviousMessages(
-    @MessageBody() data: { user1Id: string; user2Id: string },
-    @ConnectedSocket() client: Socket
-  ) {
-    try {
-      const { user1Id, user2Id } = data;
-      console.log("📥 Fetching previous messages for:", user1Id, user2Id);
+async handleGetPreviousMessages( 
+  @MessageBody() data: { user1Id: string; user2Id: string },
+  @ConnectedSocket() client: Socket
+) {
+  try {
+    const { user1Id, user2Id } = data;
 
-      const session = await this.chatService.createSession(user1Id, user2Id);
-      const messages = await this.chatService.getSessionMessages(session.session_id);
+    console.log("📥 Fetching previous messages for:", user1Id, user2Id);
 
-      // Emit **only to requesting client** to prevent multiple emits
-      client.emit("previousMessages", {
-        sessionId: session.session_id,
-        messages,
-      });
+    // FIND EXISTING SESSION
+    let session = await this.chatService.findSessionByUsers(user1Id, user2Id);
 
-      console.log(`📜 Sent ${messages.length} previous messages to client ${client.id}`);
-    } catch (error) {
-      console.error("❌ Error fetching previous messages:", error);
+    // CREATE ONLY IF ABSOLUTELY NECESSARY
+    if (!session) {
+      session = await this.chatService.createSession(user1Id, user2Id);
     }
+
+    const messages = await this.chatService.getSessionMessages(session.session_id);
+
+    client.emit("previousMessages", {
+      sessionId: session.session_id,
+      messages,
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching previous messages:", error);
   }
+}
+
 
   @SubscribeMessage("deleteMessageForMe")
   async handleDeleteForMe(
