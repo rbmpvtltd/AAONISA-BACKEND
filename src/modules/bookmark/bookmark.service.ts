@@ -54,7 +54,7 @@ export class BookmarkService {
     async findAll(userId: string) {
         return this.bookmarkRepo.find({
             where: { user: { id: userId } },
-            relations: ['reels'],
+            relations: ['reels','reels.likes','reels.comments', 'reels.views', 'reels.mentions','reels.hashtags'],
         });
     }
 
@@ -62,7 +62,7 @@ export class BookmarkService {
     async findOne(userId: string, id: number) {
         const bookmark = await this.bookmarkRepo.findOne({
             where: { id, user: { id: userId } },
-            relations: ['reels'],
+            relations: ['reels','likes'],   
         });
         if (!bookmark) throw new NotFoundException('Bookmark not found');
         return bookmark;
