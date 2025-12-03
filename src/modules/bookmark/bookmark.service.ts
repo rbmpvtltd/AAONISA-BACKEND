@@ -54,7 +54,7 @@ export class BookmarkService {
     async findAll(userId: string) {
         return this.bookmarkRepo.find({
             where: { user: { id: userId } },
-            relations: ['reels'],
+            relations: ['reels','reels.likes','reels.comments', 'reels.views', 'reels.mentions','reels.hashtags'],
         });
     }
 
