@@ -299,6 +299,9 @@ export class VideoService {
                     .outputOptions('-preset veryfast')         // ✅ quick compression
                     .outputOptions('-tune fastdecode')         // ✅ optimized for playback
                     .outputOptions('-crf 23')                  // ✅ balanced quality-size ratio
+                    .audioCodec('aac')           // Audio preserve karo
+                    .audioBitrate('128k')        // Audio quality
+                    .outputOptions('-map', '0:a?')
 
                     .save(safeOutput)
                     .on('start', cmd => console.log('🎬 FFmpeg command:', cmd))
@@ -900,7 +903,7 @@ export class VideoService {
             videoUrl: v.videoUrl,
             type: v.type,
             created_at: v.created_at,
-            thumbnailUrl: v.thumbnailUrl, 
+            thumbnailUrl: v.thumbnailUrl,
             user: {
                 id: v.user_id.id,
                 username: v.user_id.username,
