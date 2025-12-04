@@ -109,6 +109,23 @@ export class VideoService {
                 .run();
         });
     }
+
+
+    private async getVideoDuration(videoPath: string): Promise<number> {
+        return new Promise((resolve, reject) => {
+            const ffmpeg = require('fluent-ffmpeg');
+
+            ffmpeg.ffprobe(videoPath, (err: any, metadata: any) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    const duration = Math.round(metadata.format.duration);
+                    resolve(duration);
+                }
+            });
+        });
+    }
+
     private async processVideo(options: {
         inputPath: string;
         outputPath: string;
@@ -429,12 +446,232 @@ export class VideoService {
     }
 
 
+    // async create(createVideoDto: CreateVideoDto, filename: string, userId: string) {
+    //     console.log('createVideoDto:', createVideoDto);
+    //     const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    //     if (!user) {
+    //         throw new BadRequestException('User not found. Invalid token.');
+    //     }
+
+    //     // ---------------- AUDIO HANDLING ----------------
+    //     let audio: Audio | null = null;
+    //     if (createVideoDto.music && uuidValidate(createVideoDto.music.id)) {
+    //         try {
+    //             audio = await this.audioRepository.findOneOrFail({
+    //                 where: { uuid: createVideoDto.music.id },
+    //             });
+    //         } catch (err) {
+    //             console.warn('AudioId invalid or not found. Attempting to extract from video...');
+    //         }
+    //     }
+
+    //     if (!audio && createVideoDto.music) {
+    //         const videoPath = path.join(process.cwd(), 'src', 'uploads', 'videos', filename);
+    //         const audioFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.mp3`;
+    //         const audioPath = path.join(process.cwd(), 'src', 'uploads', 'audios', audioFilename);
+
+    //         const audioFolder = path.dirname(audioPath);
+    //         if (!fs.existsSync(audioFolder)) {
+    //             fs.mkdirSync(audioFolder, { recursive: true });
+    //         }
+
+    //         const hasAudio = await this.checkIfVideoHasAudio(videoPath);
+    //         if (hasAudio) {
+    //             await this.extractAudioFromVideo(videoPath, audioPath);
+
+    //             const uploadedAudio = await this.uploadService.uploadFile(audioPath, 'audios');
+    //             audio = this.audioRepository.create({
+    //                 uuid: uuidv4(),
+    //                 name: uploadedAudio.publicUrl,
+    //                 category: 'auto-extracted',
+    //                 author: userId,
+    //             });
+
+    //             await this.audioRepository.save(audio);
+    //             fs.unlinkSync(audioPath);
+    //         }
+    //     }
+
+    //     const overlayHashtags = createVideoDto.overlays
+    //         .filter(item => item.text.startsWith('#'))
+    //         .map(item => item.text);
+    //     const overlayMentions = createVideoDto.overlays
+    //         .filter(item => item.text.startsWith('@'))
+    //         .map(item => item.text);
+
+    //     const normalizedTags = ([...overlayHashtags, ...createVideoDto.hashtags || []])
+    //         .map((tag: string) => tag.trim().toLowerCase().replace(/^#/, ''));
+
+    //     const existingTags = await this.hashtagRepo.find({
+    //         where: normalizedTags.map((tag) => ({ tag })),
+    //     });
+    //     const existingTagNames = existingTags.map((t) => t.tag);
+    //     const newTags = normalizedTags
+    //         .filter((tag) => !existingTagNames.includes(tag))
+    //         .map((tag) => this.hashtagRepo.create({ tag }));
+
+    //     const overallTags = [...new Set([...existingTags, ...newTags])];
+    //     // ---------------- MENTIONS HANDLING ----------------
+    //     let mentionedUsers: User[] = [];
+    //     let mentionsArray: string[] = [];
+    //     let tempMentionsArray: string[] = [];
+    //     if (createVideoDto.mentions || overlayMentions) {
+    //         try {
+    //             if (typeof createVideoDto.mentions === 'string') {
+    //                 tempMentionsArray = JSON.parse(createVideoDto.mentions);
+    //             } else if (Array.isArray(createVideoDto.mentions)) {
+    //                 tempMentionsArray = createVideoDto.mentions;
+    //             }
+    //             if (Array.isArray(tempMentionsArray)) {
+    //                 mentionsArray = tempMentionsArray;
+    //             }
+    //             if (overlayMentions && Array.isArray(overlayMentions)) {
+    //                 mentionsArray = [...mentionsArray, ...overlayMentions];
+    //             }
+    //         } catch (err) {
+    //             throw new BadRequestException('Mentions must be a valid JSON array of usernames.');
+    //         }
+    //     }
+
+    //     if (mentionsArray.length) {
+    //         mentionedUsers = await this.userRepository.findBy({
+    //             username: In(mentionsArray),
+    //         });
+
+    //         const foundUsernames = mentionedUsers.map((u) => u.username);
+    //         const missing = mentionsArray.filter((u) => !foundUsernames.includes(u));
+
+    //         if (missing.length) {
+    //             console.warn(`Ignored invalid mentions: ${missing.join(', ')}`);
+    //         }
+
+    //     }
+
+    //     let externalAudioSrc = '';
+    //     if (createVideoDto.music && !uuidValidate(createVideoDto.music.id)) {
+    //         externalAudioSrc = createVideoDto.music.uri || '';
+    //     }
+
+    //     const videoPath = path.join(process.cwd(), 'src', 'uploads', 'videos', filename);
+    //     const compressed = await this.compressVideoOverwrite(videoPath);
+    //     const compressedPath = path.join(
+    //         path.dirname(videoPath),
+    //         `compressed_${path.basename(videoPath)}`
+    //     );
+    //     let uploadPath
+    //     // --- PROCESS VIDEO BEFORE SAVING ---
+    //     const processedFilename = `${filename}`;
+    //     const processedPath = path.join(process.cwd(), 'src', 'uploads', 'processedVideos', processedFilename);
+    //     if (createVideoDto.type === VideoType.story) {
+    //         await this.processVideo({
+    //             inputPath: compressedPath,
+    //             outputPath: processedPath,
+    //             trimStart: Number(createVideoDto.trimStart) || 0,
+    //             trimEnd: Number(createVideoDto.trimEnd) || 0,
+    //             filterColor: createVideoDto.filter || 'transparent',
+    //             overlays: createVideoDto.overlays || [],
+    //         });
+    //         uploadPath = await this.uploadService.uploadFile(processedPath, 'stories');
+    //         fs.unlinkSync(processedPath);
+    //     } else {
+    //         uploadPath = await this.uploadService.uploadFile(compressedPath, createVideoDto.type == VideoType.reels ? 'reels' : 'news');
+    //     }
+    //     let thumbnailPublicUrl = '';
+    //     try {
+    //         const thumbnailPath = await this.generateThumbnail(compressedPath);
+    //         const uploadedThumb = await this.uploadService.uploadFile(thumbnailPath, 'thumbnails');
+    //         thumbnailPublicUrl = uploadedThumb.publicUrl;
+    //         fs.unlinkSync(thumbnailPath);
+    //     } catch (err) {
+    //         console.warn('Thumbnail generation failed:', err.message);
+    //     }
+    //     fs.unlinkSync(videoPath);
+    //     fs.unlinkSync(compressedPath);
+    //     filename = processedFilename;
+
+
+    //     // ---------------- CREATE VIDEO ----------------
+    //     const video = this.videoRepository.create({
+    //         title: createVideoDto.title,
+    //         caption: createVideoDto.caption,
+    //         type: createVideoDto.type || VideoType.reels,
+    //         externalAudioSrc: externalAudioSrc,
+    //         hashtags: overallTags,
+    //         user_id: user,
+    //         audio: audio || null,
+    //         videoUrl: uploadPath.publicUrl,
+    //         mentions: mentionedUsers,
+    //         thumbnailUrl: thumbnailPublicUrl,
+    //     });
+
+    //     await this.videoRepository.save(video);
+
+    //     if (createVideoDto.type === VideoType.story) {
+    //         await this.storyDeleteQueue.add(
+    //             { videoId: video.uuid },
+    //             { delay: 24 * 60 * 60 * 1000 },
+    //         );
+
+    //         console.log(`Scheduled story deletion after 24h (ID: ${video.uuid})`);
+    //     }
+
+    //     const hashtagsToClean = (video.hashtags || []).map(h => h.id || h.tag);
+    //     // Note: map to whatever unique identifier your Hashtag entity uses (id/uuid/tag)
+
+    //     if (hashtagsToClean.length) {
+    //         // 7 days in ms
+    //         const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    //         await this.hashtagCleanupQueue.add(
+    //             'removeVideoFromHashtags', // job name (optional)
+    //             {
+    //                 videoId: video.uuid,
+    //                 hashtagIdentifiers: hashtagsToClean,
+    //             },
+    //             {
+    //                 delay: sevenDaysMs,
+    //                 attempts: 3,
+    //                 backoff: { type: 'exponential', delay: 60 * 1000 }, // retry strategy
+    //                 removeOnComplete: true,
+    //                 removeOnFail: false,
+    //             },
+    //         );
+    //     }
+    //     for (const mentionedUser of mentionedUsers) {
+    //         this.gateway.emitToUser(
+    //             mentionedUser.id,
+    //             'mentioned_in_video',
+    //             {
+    //                 whoMentioned: user.username,
+    //                 videoId: video.uuid
+    //             }
+    //         );
+    //     }
+
+    //     return "stream uploaded succsessfully";
+    // }
+
     async create(createVideoDto: CreateVideoDto, filename: string, userId: string) {
         console.log('createVideoDto:', createVideoDto);
         const user = await this.userRepository.findOne({ where: { id: userId } });
 
         if (!user) {
             throw new BadRequestException('User not found. Invalid token.');
+        }
+
+        // ✅ VIDEO DURATION - Sabse pehle calculate karo
+        const videoPath = path.join(process.cwd(), 'src', 'uploads', 'videos', filename);
+        let videoDuration = createVideoDto.duration || 15;
+
+        // Agar frontend se duration nahi aaya to ffprobe se nikalo
+        if (!createVideoDto.duration) {
+            try {
+                videoDuration = await this.getVideoDuration(videoPath);
+                console.log(`Calculated video duration: ${videoDuration}s`);
+            } catch (err) {
+                console.warn('Could not get video duration, using default 15s:', err.message);
+                videoDuration = 15;
+            }
         }
 
         // ---------------- AUDIO HANDLING ----------------
@@ -450,7 +687,6 @@ export class VideoService {
         }
 
         if (!audio && createVideoDto.music) {
-            const videoPath = path.join(process.cwd(), 'src', 'uploads', 'videos', filename);
             const audioFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.mp3`;
             const audioPath = path.join(process.cwd(), 'src', 'uploads', 'audios', audioFilename);
 
@@ -495,6 +731,7 @@ export class VideoService {
             .map((tag) => this.hashtagRepo.create({ tag }));
 
         const overallTags = [...new Set([...existingTags, ...newTags])];
+
         // ---------------- MENTIONS HANDLING ----------------
         let mentionedUsers: User[] = [];
         let mentionsArray: string[] = [];
@@ -528,7 +765,6 @@ export class VideoService {
             if (missing.length) {
                 console.warn(`Ignored invalid mentions: ${missing.join(', ')}`);
             }
-
         }
 
         let externalAudioSrc = '';
@@ -536,16 +772,17 @@ export class VideoService {
             externalAudioSrc = createVideoDto.music.uri || '';
         }
 
-        const videoPath = path.join(process.cwd(), 'src', 'uploads', 'videos', filename);
         const compressed = await this.compressVideoOverwrite(videoPath);
         const compressedPath = path.join(
             path.dirname(videoPath),
             `compressed_${path.basename(videoPath)}`
         );
-        let uploadPath
+
+        let uploadPath;
         // --- PROCESS VIDEO BEFORE SAVING ---
         const processedFilename = `${filename}`;
         const processedPath = path.join(process.cwd(), 'src', 'uploads', 'processedVideos', processedFilename);
+
         if (createVideoDto.type === VideoType.story) {
             await this.processVideo({
                 inputPath: compressedPath,
@@ -560,6 +797,7 @@ export class VideoService {
         } else {
             uploadPath = await this.uploadService.uploadFile(compressedPath, createVideoDto.type == VideoType.reels ? 'reels' : 'news');
         }
+
         let thumbnailPublicUrl = '';
         try {
             const thumbnailPath = await this.generateThumbnail(compressedPath);
@@ -569,10 +807,10 @@ export class VideoService {
         } catch (err) {
             console.warn('Thumbnail generation failed:', err.message);
         }
+
         fs.unlinkSync(videoPath);
         fs.unlinkSync(compressedPath);
         filename = processedFilename;
-
 
         // ---------------- CREATE VIDEO ----------------
         const video = this.videoRepository.create({
@@ -586,6 +824,7 @@ export class VideoService {
             videoUrl: uploadPath.publicUrl,
             mentions: mentionedUsers,
             thumbnailUrl: thumbnailPublicUrl,
+            duration: videoDuration, // ✅ Duration save
         });
 
         await this.videoRepository.save(video);
@@ -600,13 +839,11 @@ export class VideoService {
         }
 
         const hashtagsToClean = (video.hashtags || []).map(h => h.id || h.tag);
-        // Note: map to whatever unique identifier your Hashtag entity uses (id/uuid/tag)
 
         if (hashtagsToClean.length) {
-            // 7 days in ms
             const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
             await this.hashtagCleanupQueue.add(
-                'removeVideoFromHashtags', // job name (optional)
+                'removeVideoFromHashtags',
                 {
                     videoId: video.uuid,
                     hashtagIdentifiers: hashtagsToClean,
@@ -614,12 +851,13 @@ export class VideoService {
                 {
                     delay: sevenDaysMs,
                     attempts: 3,
-                    backoff: { type: 'exponential', delay: 60 * 1000 }, // retry strategy
+                    backoff: { type: 'exponential', delay: 60 * 1000 },
                     removeOnComplete: true,
                     removeOnFail: false,
                 },
             );
         }
+
         for (const mentionedUser of mentionedUsers) {
             this.gateway.emitToUser(
                 mentionedUser.id,
@@ -631,9 +869,8 @@ export class VideoService {
             );
         }
 
-        return "stream uploaded succsessfully";
+        return "stream uploaded successfully";
     }
-
 
 
     async findAll(): Promise<String[]> {
@@ -744,7 +981,7 @@ export class VideoService {
                 stories: selfStories.map(story => ({
                     id: story.uuid,
                     videoUrl: story.videoUrl,
-                    duration: 15,
+                    duration: story.duration || 15,
                     viewed: false,
                     created_at: story.created_at
                 }))
@@ -755,6 +992,9 @@ export class VideoService {
                     .filter(v => v.type === "story" && new Date(v.created_at) >= cutoffTime)
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+           console.log("Story durations: ", selfStories.map(s => s.duration));
+
+
                 return {
                     username: u.username,
                     profilePic: u.userProfile?.ProfilePicture || "",
@@ -763,14 +1003,14 @@ export class VideoService {
                     stories: userStories.map(story => ({
                         id: story.uuid,
                         videoUrl: story.videoUrl,
-                        duration: 15,
+                        duration: story.duration || 15,
                         viewed: false,
                         created_at: story.created_at
                     }))
                 };
             })
         ];
-
+        console.log("ssssssssssssss", storyUsers);
         // Filter out users with no valid stories
         const validUsers = storyUsers.filter(user => user.stories.length > 0);
 
@@ -834,6 +1074,7 @@ export class VideoService {
             type: v.type,
             created_at: v.created_at,
             thumbnailUrl: v.thumbnailUrl,
+                    duration: v.duration || 15,
             user: {
                 id: v.user_id.id,
                 username: v.user_id.username,
@@ -845,6 +1086,11 @@ export class VideoService {
             viewsCount: v.views?.length || 0,
             commentsCount: v.comments?.length || 0,
         }));
+
+      console.log('Video durations:', formatted.map(v => ({
+     
+        duration: v.duration
+    })));
 
         return {
             data: formatted,

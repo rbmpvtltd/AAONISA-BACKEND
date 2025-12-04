@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum VideoType {
@@ -59,6 +59,9 @@ export class CreateVideoDto {
   @IsEnum(VideoType)
   type: VideoType;
 
+  @IsOptional()
+  @IsNumber()
+  duration?: number;
 
   @IsString()
   trimStart: string;
