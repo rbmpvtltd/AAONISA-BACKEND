@@ -57,6 +57,9 @@ export class Video {
   })
   type: VideoType;
 
+  @Column({ type: 'int', default: 15 })
+  duration: number;
+
   @Column({ type: 'varchar', nullable: true })
   audio_trim_from: string | null;
 
