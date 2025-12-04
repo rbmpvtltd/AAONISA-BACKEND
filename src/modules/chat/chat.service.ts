@@ -132,7 +132,7 @@ export class ChatService {
 
         if (session.user1.id !== userId && session.user2.id !== userId) {
             throw new ForbiddenException('Not authorized to delete this session');
-        }
+        }   
 
         return this.chatSessionRepo.remove(session);
     }

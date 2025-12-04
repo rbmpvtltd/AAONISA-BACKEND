@@ -187,8 +187,6 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket
   ) {
     const roomId = [msg.senderId, msg.receiverId].sort().join("-");
-    console.log("📤 Sending message to room:", roomId, msg);
-
     const saved = await this.chatService.sendMessage(msg.senderId, msg.sessionId, msg.text);
 
     this.server.to(roomId).emit("Message", {
