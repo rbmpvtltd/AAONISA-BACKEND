@@ -132,7 +132,7 @@ export class ChatService {
 
         if (session.user1.id !== userId && session.user2.id !== userId) {
             throw new ForbiddenException('Not authorized to delete this session');
-        }
+        }   
 
         return this.chatSessionRepo.remove(session);
     }
@@ -237,5 +237,13 @@ export class ChatService {
 
         return { success: true, messageId: id };
     }
-
+     async findSessionByUsers(userId1: string, userId2: string) {
+        return this.chatSessionRepo.findOne({
+            where: [
+                { user1: { id: userId1 }, user2: { id: userId2 } },
+                { user1: { id: userId2 }, user2: { id: userId1 } },
+            ],
+            relations: ['user1', 'user2'],
+        });
+    }
 }
