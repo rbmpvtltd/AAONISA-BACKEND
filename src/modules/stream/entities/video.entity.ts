@@ -16,6 +16,7 @@ import { IsOptional } from 'class-validator';
 import { Hashtag } from './hashtag.entity';
 import { Bookmark } from 'src/modules/bookmark/entities/bookmark.entity';
 import { Comment } from 'src/modules/comments/entities/comment.entity';
+import { Report } from 'src/modules/reports/entities/report.entity';
 
 export enum VideoType {
   news = 'news',
@@ -95,4 +96,10 @@ export class Video {
     onDelete: 'CASCADE',
   })
   comments: Comment[];
+  @OneToMany(() => Report, (report) => report.video, {
+  cascade: true,
+  onDelete: 'CASCADE',
+})
+reports: Report[];
+
 }
