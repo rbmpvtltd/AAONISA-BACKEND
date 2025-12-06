@@ -76,7 +76,7 @@ export class FollowService {
     } catch (err) {
       console.warn('Notification failed:', err.message);
     }
-    await this.tokenService.sendNotification(userToFollow.id, 'Following', `${userWhoFollow.username}followed you`);
+    this.tokenService.sendNotification(userToFollow.id, 'Following', `${userWhoFollow.username}followed you`);
     return { message: 'Followed successfully', follow };
   }
 
