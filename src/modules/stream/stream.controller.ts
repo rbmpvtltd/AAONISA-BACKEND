@@ -1,5 +1,5 @@
 import { Multer } from 'multer';
-import { Controller, Post, UploadedFile, UseInterceptors, Body, UseGuards, Req, BadRequestException, Res, Get, Param, Query, } from '@nestjs/common';
+import { Controller, Post, UploadedFile, UseInterceptors, Body, UseGuards, Req, BadRequestException, Res, Get, Param, Query, Delete, } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -113,5 +113,10 @@ export class VideoController {
 
     const limitNum = parseInt(limit, 10) || 10;
     return this.videoService.getExploreVideosWithMain(videoId, limitNum);
+  }
+
+  @Delete('/delete/:id')
+  remove(@Param('id') id: string) {
+    return this.videoService.deleteVideoById(id);
   }
 }

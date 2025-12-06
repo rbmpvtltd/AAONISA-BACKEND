@@ -992,7 +992,7 @@ export class VideoService {
                     .filter(v => v.type === "story" && new Date(v.created_at) >= cutoffTime)
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-           console.log("Story durations: ", selfStories.map(s => s.duration));
+                console.log("Story durations: ", selfStories.map(s => s.duration));
 
 
                 return {
@@ -1074,7 +1074,7 @@ export class VideoService {
             type: v.type,
             created_at: v.created_at,
             thumbnailUrl: v.thumbnailUrl,
-                    duration: v.duration || 15,
+            duration: v.duration || 15,
             user: {
                 id: v.user_id.id,
                 username: v.user_id.username,
@@ -1087,10 +1087,9 @@ export class VideoService {
             commentsCount: v.comments?.length || 0,
         }));
 
-      console.log('Video durations:', formatted.map(v => ({
-     
-        duration: v.duration
-    })));
+        console.log('Video durations:', formatted.map(v => ({
+            duration: v.duration
+        })));
 
         return {
             data: formatted,
@@ -1166,4 +1165,12 @@ export class VideoService {
         };
     }
 
+
+     async deleteVideoById(uuid: string) {
+    const video = await this.videoRepository.findOne({ where: { uuid } });
+    if (!video) throw new NotFoundException('Video not found');
+
+    await this.videoRepository.remove(video);
+    return { success: true };
+  }
 }
