@@ -772,6 +772,31 @@ export class VideoService {
             externalAudioSrc = createVideoDto.music.uri || '';
         }
 
+        // const compressed = await this.compressVideoOverwrite(videoPath);
+        // const compressedPath = path.join(
+        //     path.dirname(videoPath),
+        //     `compressed_${path.basename(videoPath)}`
+        // );
+
+        // let uploadPath;
+        // // --- PROCESS VIDEO BEFORE SAVING ---
+        // const processedFilename = `${filename}`;
+        // const processedPath = path.join(process.cwd(), 'src', 'uploads', 'processedVideos', processedFilename);
+
+        // if (createVideoDto.type === VideoType.story) {
+        //     await this.processVideo({
+        //         inputPath: compressedPath,
+        //         outputPath: processedPath,
+        //         trimStart: Number(createVideoDto.trimStart) || 0,
+        //         trimEnd: Number(createVideoDto.trimEnd) || 0,
+        //         filterColor: createVideoDto.filter || 'transparent',
+        //         overlays: createVideoDto.overlays || [],
+        //     });
+        //     uploadPath = await this.uploadService.uploadFile(processedPath, 'stories');
+        //     fs.unlinkSync(processedPath);
+        // } else {
+        //     uploadPath = await this.uploadService.uploadFile(compressedPath, createVideoDto.type == VideoType.reels ? 'reels' : 'news');
+        // }
         const compressed = await this.compressVideoOverwrite(videoPath);
         const compressedPath = path.join(
             path.dirname(videoPath),
@@ -783,20 +808,28 @@ export class VideoService {
         const processedFilename = `${filename}`;
         const processedPath = path.join(process.cwd(), 'src', 'uploads', 'processedVideos', processedFilename);
 
+        // ✅ Process video for ALL types (reels, stories, news)
+        await this.processVideo({
+            inputPath: compressedPath,
+            outputPath: processedPath,
+            trimStart: Number(createVideoDto.trimStart) || 0,
+            trimEnd: Number(createVideoDto.trimEnd) || 0,
+            filterColor: createVideoDto.filter || 'transparent',
+            overlays: createVideoDto.overlays || [],
+        });
+
+        // Determine upload folder based on type
+        let uploadFolder: string;
         if (createVideoDto.type === VideoType.story) {
-            await this.processVideo({
-                inputPath: compressedPath,
-                outputPath: processedPath,
-                trimStart: Number(createVideoDto.trimStart) || 0,
-                trimEnd: Number(createVideoDto.trimEnd) || 0,
-                filterColor: createVideoDto.filter || 'transparent',
-                overlays: createVideoDto.overlays || [],
-            });
-            uploadPath = await this.uploadService.uploadFile(processedPath, 'stories');
-            fs.unlinkSync(processedPath);
+            uploadFolder = 'stories';
+        } else if (createVideoDto.type === VideoType.reels) {
+            uploadFolder = 'reels';
         } else {
-            uploadPath = await this.uploadService.uploadFile(compressedPath, createVideoDto.type == VideoType.reels ? 'reels' : 'news');
+            uploadFolder = 'news';
         }
+
+        uploadPath = await this.uploadService.uploadFile(processedPath, uploadFolder);
+        fs.unlinkSync(processedPath);
 
         let thumbnailPublicUrl = '';
         try {
@@ -1166,11 +1199,11 @@ export class VideoService {
     }
 
 
-     async deleteVideoById(uuid: string) {
-    const video = await this.videoRepository.findOne({ where: { uuid } });
-    if (!video) throw new NotFoundException('Video not found');
+    async deleteVideoById(uuid: string) {
+        const video = await this.videoRepository.findOne({ where: { uuid } });
+        if (!video) throw new NotFoundException('Video not found');
 
-    await this.videoRepository.remove(video);
-    return { success: true };
-  }
+        await this.videoRepository.remove(video);
+        return { success: true };
+    }
 }
