@@ -20,6 +20,7 @@ import { UploadModule } from "./modules/upload/upload.module";
 import { UserProfileModule } from "./modules/users/user.module";
 import { ViewModule } from "./modules/views/view.module";
 import { TestController } from "./test/test.controller";
+import { SharedModule } from 'src/modules/shared/shared.module'
 @Module({
 	imports: [
 		ConfigModule.forRoot({ isGlobal: true }),
@@ -34,6 +35,7 @@ import { TestController } from "./test/test.controller";
 		}),
 		ScheduleModule.forRoot(),
 		AuthModule,
+		SharedModule,
 		UserProfileModule,
 		StreamModule,
 		FollowModule,
@@ -48,8 +50,8 @@ import { TestController } from "./test/test.controller";
 		TypeOrmModule.forFeature([Bookmark, Comment]),
 	],
 	controllers: [TestController],
-	providers: [AppGateway],
-	exports: [AppGateway],
+	providers: [],
+	exports: [],
 })
 
 // checking ci/cd

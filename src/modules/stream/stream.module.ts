@@ -7,13 +7,13 @@ import { VideoController } from './stream.controller';
 import { User } from '../users/entities/user.entity';
 import { UserProfileModule } from '../users/user.module';
 import { Hashtag } from './entities/hashtag.entity';
-import { AppGateway } from 'src/app.gateway';
+import { SharedModule } from 'src/modules/shared/shared.module';
 import { UploadService } from '../upload/upload.service';
 import { BullModule } from '@nestjs/bull';
 import { Follow } from '../follows/entities/follow.entity';
 @Module({
-  imports: [TypeOrmModule.forFeature([Video, Audio,User,Hashtag,Follow]),UserProfileModule,BullModule.registerQueue({name:'story-delete'},{name:'hashtag-cleanup'})],
+  imports: [TypeOrmModule.forFeature([Video, Audio,User,Hashtag,Follow]),UserProfileModule,BullModule.registerQueue({name:'story-delete'},{name:'hashtag-cleanup'}),SharedModule],
   controllers: [VideoController],
-  providers: [VideoService,AppGateway,UploadService],
+  providers: [VideoService,UploadService],
 })
 export class StreamModule {}
