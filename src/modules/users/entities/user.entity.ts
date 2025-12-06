@@ -20,6 +20,7 @@ import { is } from 'drizzle-orm';
 import { IsOptional } from 'class-validator';
 import { ChatSession } from 'src/modules/chat/entities/chat-session.entity';
 import { Chat } from 'src/modules/chat/entities/chat.entity';
+import { Report } from 'src/modules/reports/entities/report.entity';
 export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
@@ -108,5 +109,8 @@ export class User {
 
   @OneToMany(() => Chat, (chat) => chat.sender)
   messagesSent: Chat[];
+
+  @OneToMany(() => Report, (report) => report.user)
+reports: Report[];
 
 }

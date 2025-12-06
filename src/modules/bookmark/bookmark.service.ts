@@ -52,11 +52,55 @@ export class BookmarkService {
 
     // 🟣 Find all bookmarks for a user
     async findAll(userId: string) {
-        return this.bookmarkRepo.find({
-            where: { user: { id: userId } },
-            relations: ['reels','reels.likes','reels.comments', 'reels.views', 'reels.mentions','reels.hashtags'],
-        });
-    }
+    const bookmarks = await this.bookmarkRepo.find({
+        where: { user: { id: userId } },
+        relations: [
+            'reels',
+            'reels.likes',
+            'reels.comments',
+            'reels.views',
+            'reels.mentions',
+            'reels.hashtags',
+            'reels.user_id',
+            'reels.user_id.userProfile',
+        ],
+    });
+
+    const transformed = bookmarks.map(bookmark => ({
+        id: bookmark.id,
+        name: bookmark.name,
+        reels: bookmark.reels.map(reel => ({
+            uuid: reel.uuid,
+            user: {
+                userProfile: reel.user_id.userProfile.ProfilePicture,
+                username: reel.user_id.username
+            },
+            title: reel.title,
+            caption: reel.caption,
+            videoUrl: reel.videoUrl,
+            thumbnailUrl: reel.thumbnailUrl,
+            externalAudioSrc: reel.externalAudioSrc,
+            type: reel.type,
+            duration: reel.duration,
+            audio_trim_from: reel.audio_trim_from,
+            audio_trim_to: reel.audio_trim_to,
+            created_at: reel.created_at,
+            archived: reel.archived,
+            likes: {
+                count: reel.likes.length,
+                likedByMe: reel.likes.some(like => like.user.id === userId)
+            },
+            views: reel.views,
+            mentions: reel.mentions,
+            hashtags: reel.hashtags,
+            comments_count:reel.comments.length,
+            comments: reel.comments
+        }))
+    }));
+
+    return transformed;
+}
+
 
     // 🔵 Find one
     async findOne(userId: string, id: number) {
