@@ -67,32 +67,37 @@ export class TokenService {
   // 🚀 NEW: Send Normal Notification
   // ---------------------------------------------
   async sendNotification(userId: string, title: string, body: string, data?: Record<string, any>) {
-    const tokenEntity = await this.tokenRepo.findOne({ where: { user: { id: userId } } });
-    if(!tokenEntity) throw new NotFoundException('Token not found');
-
-    const token = tokenEntity.token;
-    this.validateTokenFormat(token);
-    const message: ExpoPushMessage = {
-      to: token,
-      sound: 'default',
-      title,
-      body,
-      data: data || {},
-    };
-
-    const tickets: ExpoPushTicket[] = await this.expo.sendPushNotificationsAsync([message]);
-    const ticket = tickets[0];
-
-    if (ticket.status === 'error') {
-      console.error('Push failed:', ticket.message);
-      if (ticket.details?.error === 'DeviceNotRegistered') {
-        await this.removeInvalidToken(token);
-      }
-      throw new BadRequestException(ticket.message);
-    }
-
-    return { success: true, ticket };
+  const tokenEntity = await this.tokenRepo.findOne({ where: { user: { id: userId } } });
+  if (!tokenEntity) {
+    console.warn(`Cannot send notification: No token found for user ${userId}`);
+    return { success: false, message: 'No token assigned to this user' }; // or just { success: false }
   }
+
+  const token = tokenEntity.token;
+  this.validateTokenFormat(token);
+
+  const message: ExpoPushMessage = {
+    to: token,
+    sound: 'default',
+    title,
+    body,
+    data: data || {},
+  };
+
+  const tickets: ExpoPushTicket[] = await this.expo.sendPushNotificationsAsync([message]);
+  const ticket = tickets[0];
+
+  if (ticket.status === 'error') {
+    console.error('Push failed:', ticket.message);
+    if (ticket.details?.error === 'DeviceNotRegistered') {
+      await this.removeInvalidToken(token);
+    }
+    throw new BadRequestException(ticket.message);
+  }
+  console.log("notification sent successfully to user:", userId);
+  return { success: true, ticket };
+}
+
 
   // ---------------------------------------------
   // 🔕 NEW: Send Silent (Data-only) Notification
