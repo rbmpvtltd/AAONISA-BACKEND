@@ -66,9 +66,8 @@ export class FollowService {
     });
 
     await this.followRepository.save(follow);
-    // this.gateway.emitToUser(followingId, 'followState', `${follow.follower}`);
     try {
-      await this.tokenService.sendNotification(
+       this.tokenService.sendNotification(
         followingId,
         'Followed',
         `${userWhoFollow.username} followed you`
@@ -76,7 +75,6 @@ export class FollowService {
     } catch (err) {
       console.warn('Notification failed:', err.message);
     }
-    this.tokenService.sendNotification(userToFollow.id, 'Following', `${userWhoFollow.username}followed you`);
     return { message: 'Followed successfully', follow };
   }
 
