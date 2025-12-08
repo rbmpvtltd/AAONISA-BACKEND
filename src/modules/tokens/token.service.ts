@@ -130,26 +130,17 @@ export class TokenService {
   }
 
   const tickets = await this.expo.sendPushNotificationsAsync(messages);
-
-  console.log('✅ Expo Tickets:', tickets);
-
-  // ✅ RECEIPT CHECK (REAL DELIVERY STATUS)
   const receiptIds = tickets
   .filter(t => t.status === 'ok')
-  .map(t => (t as any).id)   // ✅ SAFE FORCE CAST
+  .map(t => (t as any).id)
   .filter(Boolean);
-
 
   if (receiptIds.length) {
     const receipts = await this.expo.getPushNotificationReceiptsAsync(receiptIds);
-    console.log('📦 Expo Receipts:', receipts);
-
     for (const receiptId in receipts) {
       const receipt = receipts[receiptId];
 
       if (receipt.status === 'error') {
-        console.error('❌ Delivery failed:', receipt);
-
         if (receipt.details?.error === 'DeviceNotRegistered') {
           const badToken = messages.find(m => m.to === receiptId)?.to;
           if (badToken) {
