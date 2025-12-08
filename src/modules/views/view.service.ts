@@ -41,4 +41,8 @@ export class ViewService {
 
     return { message: 'Reel viewed successfully', viewed: true };
   }
+  async getAllViews(storyId:string){
+    const views = await this.viewRepository.find({where:{reel:{uuid:storyId}}});
+    return views;
+  }
 }

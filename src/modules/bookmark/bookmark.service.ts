@@ -65,7 +65,7 @@ export class BookmarkService {
             'reels.user_id.userProfile',
         ],
     });
-
+    console.log(" 🟣 Find all bookmarks for a user",bookmarks);
     const transformed = bookmarks.map(bookmark => ({
         id: bookmark.id,
         name: bookmark.name,
