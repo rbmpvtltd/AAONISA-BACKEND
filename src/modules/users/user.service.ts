@@ -417,7 +417,7 @@ export class UserService {
     };
   }
 
-    async checkUsername(username: string) {
+  async checkUsername(username: string) {
     const user = await this.userRepository.findOne({ where: { username } });
     return { available: !user };
   }
@@ -428,7 +428,7 @@ export class UserService {
     if (!users || users.length === 0) {
       return { success: false, message: 'No users found' };
     }
-    
+
     return users;
     // return { success: true, message: 'Profile updated successfully',dataUri: userProfile.url};
   }
