@@ -96,13 +96,16 @@ export class UserController {
     return this.userService.updateProfile(dto, req.user);
   }
 
+  @Post("check-username")
+  async checkUsername(@Body() username: string ) {
+    return await this.userService.checkUsername(username);
+  }
   
   @UseGuards(JwtAuthGuard)
   @Get('all-users')
   async allUusersDetails() {
     return this.userService.allUusersDetails();
   }
-
 
   @UseGuards(JwtAuthGuard)
   @Get('profile/current')
