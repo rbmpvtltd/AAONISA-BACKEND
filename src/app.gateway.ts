@@ -435,9 +435,9 @@ export class AppGateway
     const requestId = `${client.id}-${startTime}`;
     
     try {
-      this.logger.log(
-        `📥 [${requestId}] Message from ${payload.senderId} to ${payload.receiverId}`
-      );
+      // this.logger.log(
+      //   `📥 [${requestId}] Message from ${payload.senderId} to ${payload.receiverId}`
+      // );
 
       const { sessionId, senderId, receiverId, text } = payload;
 

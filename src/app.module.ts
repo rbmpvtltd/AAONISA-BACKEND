@@ -21,6 +21,7 @@ import { UserProfileModule } from "./modules/users/user.module";
 import { ViewModule } from "./modules/views/view.module";
 import { TestController } from "./test/test.controller";
 import { SharedModule } from 'src/modules/shared/shared.module'
+import { ReportModule } from "./modules/reports/report.module";
 @Module({
 	imports: [
 		ConfigModule.forRoot({ isGlobal: true }),
@@ -47,6 +48,7 @@ import { SharedModule } from 'src/modules/shared/shared.module'
 		CommentModule,
 		TokenModule,
 		ChatModule,
+		ReportModule,
 		TypeOrmModule.forFeature([Bookmark, Comment]),
 	],
 	controllers: [TestController],
