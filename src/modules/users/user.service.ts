@@ -417,6 +417,11 @@ export class UserService {
     };
   }
 
+    async checkUsername(username: string) {
+    const user = await this.userRepository.findOne({ where: { username } });
+    return { available: !user };
+  }
+
   async allUusersDetails() {
     const users = await this.userRepository.find({ relations: ['userProfile'], });
 
@@ -425,12 +430,8 @@ export class UserService {
     }
     
     return users;
-    
-
-
     // return { success: true, message: 'Profile updated successfully',dataUri: userProfile.url};
   }
-
 
   async getCurrentUser(userId: string) {
     // const user = await this.userRepository.findOneBy({ id: userId }) ;
