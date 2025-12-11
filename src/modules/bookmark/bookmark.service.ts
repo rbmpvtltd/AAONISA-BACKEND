@@ -51,57 +51,109 @@ export class BookmarkService {
     }
 
     // 🟣 Find all bookmarks for a user
+    //     async findAll(userId: string) {
+    //     const bookmarks = await this.bookmarkRepo.find({
+    //         where: { user: { id: userId } },
+    //         relations: [
+    //             'reels',
+    //             'reels.likes',
+    //             'reels.comments',
+    //             'reels.views',
+    //             'reels.mentions',
+    //             'reels.hashtags',
+    //             'reels.user_id',
+    //             'reels.user_id.userProfile',
+    //         ],
+    //     });
+
+    //     const transformed = bookmarks.map(bookmark => ({
+    //         id: bookmark.id,
+    //         name: bookmark.name,
+    //         reels: bookmark.reels.map(reel => ({
+    //             uuid: reel.uuid,
+    //             user: {
+    //                 userProfile: reel.user_id.userProfile.ProfilePicture,
+    //                 username: reel.user_id.username
+    //             },
+    //             title: reel.title,
+    //             caption: reel.caption,
+    //             videoUrl: reel.videoUrl,
+    //             thumbnailUrl: reel.thumbnailUrl,
+    //             externalAudioSrc: reel.externalAudioSrc,
+    //             type: reel.type,
+    //             duration: reel.duration,
+    //             audio_trim_from: reel.audio_trim_from,
+    //             audio_trim_to: reel.audio_trim_to,
+    //             created_at: reel.created_at,
+    //             archived: reel.archived,
+    //             likes: {
+    //                 count: reel.likes.length,
+    //                 likedByMe: reel.likes.some(like => like.user.id === userId)
+    //             },
+    //             views: reel.views,
+    //             mentions: reel.mentions,
+    //             hashtags: reel.hashtags,
+    //             comments_count:reel.comments.length,
+    //             comments: reel.comments
+    //         }))
+    //     }));
+
+    //     return transformed;
+    // }
+
     async findAll(userId: string) {
-    const bookmarks = await this.bookmarkRepo.find({
-        where: { user: { id: userId } },
-        relations: [
-            'reels',
-            'reels.likes',
-            'reels.comments',
-            'reels.views',
-            'reels.mentions',
-            'reels.hashtags',
-            'reels.user_id',
-            'reels.user_id.userProfile',
-        ],
-    });
+        //     return this.bookmarkRepo.find({
+        //         where: { user: { id: userId } },
+        //         relations: ['reels','reels.likes','reels.comments', 'reels.views', 'reels.mentions','reels.hashtags'],
+        //     });
+        // }
+        const bookmarks = await this.bookmarkRepo.find({
+            where: { user: { id: userId } },
+            relations: [
+                'reels',
+                'reels.likes',
+                'reels.comments',
+                'reels.views',
+                'reels.mentions',
+                'reels.hashtags',
+                'reels.user_id',
+                'reels.user_id.userProfile',
+            ],
+        });
 
-    const transformed = bookmarks.map(bookmark => ({
-        id: bookmark.id,
-        name: bookmark.name,
-        reels: bookmark.reels.map(reel => ({
-            uuid: reel.uuid,
-            user: {
-                userProfile: reel.user_id.userProfile.ProfilePicture,
-                username: reel.user_id.username
-            },
-            title: reel.title,
-            caption: reel.caption,
-            videoUrl: reel.videoUrl,
-            thumbnailUrl: reel.thumbnailUrl,
-            externalAudioSrc: reel.externalAudioSrc,
-            type: reel.type,
-            duration: reel.duration,
-            audio_trim_from: reel.audio_trim_from,
-            audio_trim_to: reel.audio_trim_to,
-            created_at: reel.created_at,
-            archived: reel.archived,
-            likes: {
-                count: reel.likes.length,
-                likedByMe: reel.likes.some(like => like.user.id === userId)
-            },
-            views: reel.views,
-            mentions: reel.mentions,
-            hashtags: reel.hashtags,
-            comments_count:reel.comments.length,
-            comments: reel.comments
-        }))
-    }));
+        const transformed = bookmarks.map(bookmark => ({
+            id: bookmark.id,
+            name: bookmark.name,
+            reels: bookmark.reels.map(reel => ({
+                uuid: reel.uuid,
+                user: {
+                    userProfile: reel.user_id.userProfile.ProfilePicture,
+                    username: reel.user_id.username
+                },
+                title: reel.title,
+                caption: reel.caption,
+                videoUrl: reel.videoUrl,
+                thumbnailUrl: reel.thumbnailUrl,
+                externalAudioSrc: reel.externalAudioSrc,
+                type: reel.type,
+                duration: reel.duration,
+                audio_trim_from: reel.audio_trim_from,
+                audio_trim_to: reel.audio_trim_to,
+                created_at: reel.created_at,
+                archived: reel.archived,
+                likes: {
+                    count: reel.likes.length
+                },
+                views: reel.views,
+                mentions: reel.mentions,
+                hashtags: reel.hashtags,
+                comments_count: reel.comments.length,
+                comments: reel.comments
+            }))
+        }));
 
-    return transformed;
-}
-
-
+        return transformed;
+    }
     // 🔵 Find one
     async findOne(userId: string, id: number) {
         const bookmark = await this.bookmarkRepo.findOne({
@@ -158,6 +210,8 @@ export class BookmarkService {
             where: { uuid: dto.reelId },
         });
 
+        if (!newReels) throw new NotFoundException('Reel not found');
+
         // Purani + nayi reels combine karo
         bookmark.reels = [...bookmark.reels, ...newReels];
 
@@ -165,6 +219,35 @@ export class BookmarkService {
 
         return bookmark;
     }
+
+    // async addReel(userId: string, dto: CreateBookmarkDto) {
+    //     const user = await this.userRepo.findOne({ where: { id: userId } });
+    //     if (!user) throw new NotFoundException('User not found');
+
+    //     const bookmark = await this.bookmarkRepo.findOne({
+    //         where: { name: dto.name, user: { id: userId } },
+    //         relations: ['reels'],
+    //     });
+
+    //     if (!bookmark) throw new NotFoundException('Bookmark not found');
+
+    //     // Sirf EK reel fetch karo, array nahi
+    //     const reel = await this.reelRepo.findOne({
+    //         where: { uuid: dto.reelId },
+    //     });
+
+    //     if (!reel) throw new NotFoundException('Reel not found');
+
+    //     // Duplicate check
+    //     const alreadyExists = bookmark.reels.some(r => r.uuid === reel.uuid);
+    //     if (alreadyExists) return bookmark;
+
+    //     // Sirf ek reel push karo
+    //     bookmark.reels.push(reel);
+
+    //     return await this.bookmarkRepo.save(bookmark);
+    // }
+
 
     async removeReel(userId: string, dto: CreateBookmarkDto) {
         const user = await this.userRepo.findOne({
