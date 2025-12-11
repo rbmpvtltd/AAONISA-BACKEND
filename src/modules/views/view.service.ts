@@ -23,7 +23,6 @@ export class ViewService {
       where: { user: { id : userId }, reel: { uuid: reelId } },
     });
 
-
     if (alreadyViewed) {
       return { message: 'Reel already viewed', viewed: false };
     }
@@ -41,8 +40,36 @@ export class ViewService {
 
     return { message: 'Reel viewed successfully', viewed: true };
   }
-  async getAllViews(storyId:string){
-    const views = await this.viewRepository.find({where:{reel:{uuid:storyId}}});
-    return views;
-  }
+  async getAllViews(storyId: string) {
+  const views = await this.viewRepository
+  .createQueryBuilder("view")
+  .leftJoin("view.user", "user")
+  .leftJoin("user.userProfile", "profile")
+  .select([
+    "view.view_id AS view_id",
+    "view.createdAt AS createdAt",
+    "user.username AS username",
+    "profile.ProfilePicture AS profilePic",
+  ])
+  .where("view.reelUuid = :storyId", { storyId })
+  .orderBy("view.createdAt", "DESC")
+  .getRawMany();
+  return views;
+}
+async getSingleView(userId: string, storyId: string) {
+  return await this.viewRepository
+    .createQueryBuilder("view")
+    .leftJoin("view.user", "user")
+    .leftJoin("user.userProfile", "profile")
+    .select([
+      "view.view_id AS view_id",
+      "view.createdAt AS createdAt",
+      "user.username AS username",
+      "profile.ProfilePicture AS profilePic",
+    ])
+    .where("user.id = :userId", { userId })
+    .andWhere("view.reelUuid = :storyId", { storyId })
+    .getRawOne();
+}
+
 }

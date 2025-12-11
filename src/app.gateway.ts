@@ -544,26 +544,50 @@ export class AppGateway
     }
   }
   @SubscribeMessage('getStoryViews')
-  async handleGetStoryViews(
-    @MessageBody() payload,
-    @ConnectedSocket() client: Socket
-  ){
-    try {
-      const { storyId } = payload;
+async handleGetStoryViews(
+  @MessageBody() payload,
+  @ConnectedSocket() client: Socket
+){
+  try {
+    const { storyId } = payload;
+    if (!storyId) {
+      client.emit("error", { message: "Invalid delete payload" });
+      return;
+    }
+    const views = await this.viewService.getAllViews(storyId);
+    client.emit('storyViews', { views });
 
-      if (!storyId) {
-        client.emit("error", { message: "Invalid delete payload" });
-        return;
-      }
-
-      const views = await this.viewService.getAllViews(storyId);
-      client.emit('storyViews', { views });
-  }
+    return; // <-- VERY IMPORTANT
+  } 
   catch (error) {
-    this.logger.error("Error deleting message for user:", error);
-    client.emit("error", { message: "Failed to delete message" });
+    this.logger.error("Error getting views:", error);
+    client.emit("error", { message: "Failed to get story views" });
   }
 }
+  @SubscribeMessage('viewStory')
+async handleStoryView(
+  @MessageBody() payload: { userId: string; storyId: string },
+  @ConnectedSocket() client: Socket
+) {
+  try {
+    const { userId, storyId } = payload;
+
+    const result = await this.viewService.viewReel(userId, storyId);
+
+    // Agar pehle hi viewed tha to emit mat karo
+    if (!result.viewed) return;
+
+    // NEW VIEW DETAILS FETCH KARO
+    const newView = await this.viewService.getSingleView(userId, storyId);
+
+    // 🔥 Real-time emit to story room
+    this.server.to(`story:${storyId}`).emit("story:newView", newView);
+
+  } catch (error) {
+    client.emit("error", { message: "Failed to add story view" });
+  }
+}
+
   @SubscribeMessage("deleteMessageForEveryone")
   async handleDeleteForEveryone(
     @MessageBody() payload: DeleteMessagePayload,
