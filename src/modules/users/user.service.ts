@@ -417,20 +417,21 @@ export class UserService {
     };
   }
 
+  async checkUsername(username: string) {
+    const user = await this.userRepository.findOne({ where: { username } });
+    return { available: !user };
+  }
+
   async allUusersDetails() {
     const users = await this.userRepository.find({ relations: ['userProfile'], });
 
     if (!users || users.length === 0) {
       return { success: false, message: 'No users found' };
     }
-    
+
     return users;
-    
-
-
     // return { success: true, message: 'Profile updated successfully',dataUri: userProfile.url};
   }
-
 
   async getCurrentUser(userId: string) {
     // const user = await this.userRepository.findOneBy({ id: userId }) ;
