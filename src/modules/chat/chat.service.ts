@@ -4,7 +4,7 @@ import { Repository, MoreThan, LessThan } from 'typeorm';
 import { ChatSession } from './entities/chat-session.entity';
 import { Chat } from './entities/chat.entity';
 import { User } from '../users/entities/user.entity';
-
+import { Video } from '../stream/entities/video.entity';
 @Injectable()
 export class ChatService {
     constructor(
@@ -16,6 +16,9 @@ export class ChatService {
 
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+
+        @InjectRepository(Video)
+        private readonly videoRepo: Repository<Video>,
     ) { }
 
     async createSession(senderId: string, receiverId: string) {
@@ -246,4 +249,50 @@ export class ChatService {
             relations: ['user1', 'user2'],
         });
     }
+     
+    async shareReelMultiple(senderId: string, reelId: string, sessionIds: number[]) {
+    if (!sessionIds?.length) {
+        throw new BadRequestException("sessionIds array is required");
+    }
+    const reel = await this.videoRepo.findOneBy({ uuid: reelId });
+    if (!reel) {
+        throw new NotFoundException("Reel not found");
+    }
+    // 1. Get Reel data (replace with your own reel table logic)
+    const reelURL = reel.videoUrl;
+    const thumbURL = reel.thumbnailUrl;
+
+    // 2. Fixed format message
+    const messagePayload = {
+        type: "reel",
+        reelId,
+        url: reelURL,
+        thumbnail: thumbURL
+    };
+    for (const sessionId of sessionIds) {
+        // 3. Validate session
+        const session = await this.chatSessionRepo.findOne({
+            where: { session_id: sessionId },
+        });
+
+        if (!session) continue; // Skip invalid sessions
+
+        // 4. Validate sender
+        const sender = await this.userRepo.findOneBy({ id: senderId });
+        if (!sender) throw new NotFoundException("Sender not found");
+
+        // 5. Create message
+        const chat = this.chatRepo.create({
+            session,
+            sender,
+            message_text: JSON.stringify(messagePayload), // <-- IMPORTANT
+        });
+        await this.chatRepo.save(chat);
+    }
+
+    return {
+        success: true,
+    };
+}
+
 }

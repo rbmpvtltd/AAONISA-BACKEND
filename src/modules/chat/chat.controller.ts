@@ -91,6 +91,12 @@ async deleteMessageForEveryone(
   return this.chatService.deleteMessageForEveryone(userId, messageId);
 }
 
+@Post('shareReelMultiple')
+async shareReelMultiple(@Req() req, @Body() {reelId,sessionIds}:{reelId:string,sessionIds:number[]}) {
+  const payload = req.user;
+  const senderId = payload?.sub || payload?.id || payload?.userId;
+  return this.chatService.shareReelMultiple(senderId, reelId,sessionIds);
+}
   // // Delete a message
   // @Delete('messages/:id')
   // deleteMessage(@Param('id') messageId: number, @Req() req) {
