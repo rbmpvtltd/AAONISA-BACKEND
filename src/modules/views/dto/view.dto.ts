@@ -6,5 +6,5 @@ import { ApiProperty } from '@nestjs/swagger';
 export class ViewDto {
   @ApiProperty({ type: 'string', format: 'uuid' })
   @IsUUID()
-  reel_id: string;
+  storyId: string;
 }

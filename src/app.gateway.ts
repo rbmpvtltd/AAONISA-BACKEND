@@ -291,7 +291,7 @@ import {
 import { Server, Socket } from "socket.io";
 import { Logger } from "@nestjs/common";
 import { ChatService } from "./modules/chat/chat.service";
-
+import { ViewService } from "./modules/views/view.service";
 interface JoinRoomPayload {
   roomId: string;
 }
@@ -336,8 +336,7 @@ export class AppGateway
   // Track if gateway is initialized
   private isInitialized = false;
 
-  constructor(private readonly chatService: ChatService) {}
-
+  constructor(private readonly chatService: ChatService,private readonly viewService: ViewService) {}
   /* ========================================
      GATEWAY INITIALIZATION
   ======================================== */
@@ -435,9 +434,9 @@ export class AppGateway
     const requestId = `${client.id}-${startTime}`;
     
     try {
-      // this.logger.log(
-      //   `📥 [${requestId}] Message from ${payload.senderId} to ${payload.receiverId}`
-      // );
+      this.logger.log(
+        `📥 [${requestId}] Message from ${payload.senderId} to ${payload.receiverId}`
+      );
 
       const { sessionId, senderId, receiverId, text } = payload;
 
@@ -544,6 +543,50 @@ export class AppGateway
       client.emit("error", { message: "Failed to delete message" });
     }
   }
+  @SubscribeMessage('getStoryViews')
+async handleGetStoryViews(
+  @MessageBody() payload,
+  @ConnectedSocket() client: Socket
+){
+  try {
+    const { storyId } = payload;
+    if (!storyId) {
+      client.emit("error", { message: "Invalid delete payload" });
+      return;
+    }
+    const views = await this.viewService.getAllViews(storyId);
+    client.emit('storyViews', { views });
+
+    return; // <-- VERY IMPORTANT
+  } 
+  catch (error) {
+    this.logger.error("Error getting views:", error);
+    client.emit("error", { message: "Failed to get story views" });
+  }
+}
+  @SubscribeMessage('viewStory')
+async handleStoryView(
+  @MessageBody() payload: { userId: string; storyId: string },
+  @ConnectedSocket() client: Socket
+) {
+  try {
+    const { userId, storyId } = payload;
+
+    const result = await this.viewService.viewReel(userId, storyId);
+
+    // Agar pehle hi viewed tha to emit mat karo
+    if (!result.viewed) return;
+
+    // NEW VIEW DETAILS FETCH KARO
+    const newView = await this.viewService.getSingleView(userId, storyId);
+
+    // 🔥 Real-time emit to story room
+    this.server.to(`story:${storyId}`).emit("story:newView", newView);
+
+  } catch (error) {
+    client.emit("error", { message: "Failed to add story view" });
+  }
+}
 
   @SubscribeMessage("deleteMessageForEveryone")
   async handleDeleteForEveryone(
