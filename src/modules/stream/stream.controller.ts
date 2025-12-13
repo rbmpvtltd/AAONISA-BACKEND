@@ -79,25 +79,47 @@ export class VideoController {
     return this.videoService.getAllStories(user.userId);
   }
 
+  // @Get('feed')
+  // @UseGuards(JwtAuthGuard)
+  // async getFeed(
+  //   @Req() req: Request,
+  //   @Query('type') type: 'followings' | 'news' | 'explore',
+  //   @Query('page') page: string,
+  //   @Query('limit') limit: string,
+  // ) {
+  //   const user = req.user as { userId?: string };
+  //   if (!user || !user.userId) {
+  //     throw new BadRequestException('Invalid or missing user ID in token.');
+  //   }
+
+  //   const feedType = type || 'news';
+  //   const pageNum = parseInt(page, 10) || 1;
+  //   const limitNum = parseInt(limit, 10) || 10;
+
+  //   return this.videoService.getVideosFeed(user.userId, feedType, pageNum, limitNum);
+  // }
   @Get('feed')
-  @UseGuards(JwtAuthGuard)
-  async getFeed(
-    @Req() req: Request,
-    @Query('type') type: 'followings' | 'news' | 'explore',
-    @Query('page') page: string,
-    @Query('limit') limit: string
-  ) {
-    const user = req.user as { userId?: string };
-    if (!user || !user.userId) {
-      throw new BadRequestException('Invalid or missing user ID in token.');
-    }
-
-    const feedType = type || 'news';
-    const pageNum = parseInt(page, 10) || 1;
-    const limitNum = parseInt(limit, 10) || 10;
-
-    return this.videoService.getVideosFeed(user.userId, feedType, pageNum, limitNum);
+@UseGuards(JwtAuthGuard)
+async getFeed(
+  @Req() req: Request,
+  @Query('type') type: 'followings' | 'news' | 'explore',
+  @Query('page') page: string,
+  @Query('limit') limit: string,
+  @Query('random') random: string, // 👈 NEW
+) {
+  const user = req.user as { userId?: string };
+  if (!user?.userId) {
+    throw new BadRequestException('Invalid or missing user ID in token.');
   }
+
+  return this.videoService.getVideosFeed(
+    user.userId,
+    type || 'news',
+    parseInt(page, 10) || 1,
+    parseInt(limit, 10) || 10,
+    random === 'true' // 👈 string → boolean
+  );
+}
 
   @Get('explore/:id')
   @UseGuards(JwtAuthGuard)
