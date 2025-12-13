@@ -39,7 +39,7 @@ export class TokenService {
 
   async assignToken(dto: AssignTokenDto, userId: string) {
     const { token } = dto;
-
+    console.log("token :",token)
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
@@ -51,8 +51,13 @@ export class TokenService {
   }
 
   async unassignToken(token: string, userId: string) {
+    
     const tokenEntity = await this.tokenRepo.findOne({ where: { token }, relations: ['user'] });
+    
     if (!tokenEntity) throw new NotFoundException('Token not found');
+    if (tokenEntity.user?.id !== userId) {
+  throw new BadRequestException('This token is not assigned to this user');
+}
 
     tokenEntity.user = null;
     return await this.tokenRepo.save(tokenEntity);
@@ -97,24 +102,48 @@ export class TokenService {
 //   console.log("notification sent successfully to user:", userId);
 //   return { success: true, ticket };
 // }
-  async sendNotification(userId: string, title: string, body: string, data?: Record<string, any>) {
+async sendNotification(
+  userId: string,
+  title: string,
+  body: string,
+  data?: Record<string, any>
+) {
+  console.log('================ PUSH DEBUG START ================');
+  console.log('🎯 Target userId:', userId);
+  console.log('📨 Title:', title);
+  console.log('📨 Body:', body);
 
   const tokenEntities = await this.tokenRepo.find({
     where: { user: { id: userId } },
+    relations: ['user'], // ✅ IMPORTANT
   });
 
+  console.log(
+    '📦 Tokens found count:',
+    tokenEntities.length
+  );
+
   if (!tokenEntities.length) {
-    console.warn(`❌ No push tokens for user: ${userId}`);
+    console.warn(
+      '❌ NO TOKENS FOUND FOR USER:',
+      userId
+    );
+    console.log('================ PUSH DEBUG END =================');
     return { success: false, reason: 'NO_TOKEN' };
   }
 
   const messages: ExpoPushMessage[] = [];
 
   for (const tokenEntity of tokenEntities) {
+    console.log('➡️ Token entity:', {
+      token: tokenEntity.token,
+      tokenUserId: tokenEntity.user?.id,
+    });
+
     const token = tokenEntity.token;
 
     if (!Expo.isExpoPushToken(token)) {
-      console.error('❌ Invalid token detected:', token);
+      console.error('❌ Invalid Expo token:', token);
       await this.removeInvalidToken(token);
       continue;
     }
@@ -124,35 +153,22 @@ export class TokenService {
       sound: 'default',
       title,
       body,
-      data: data || {},
-      channelId: 'default', // ✅ ANDROID FIX
+      data: {
+        ...data,
+        debugTargetUserId: userId, // 🧠 EXTRA DEBUG
+      },
+      channelId: 'default',
     });
   }
 
+  console.log('🚀 Final messages payload:', messages);
+
   const tickets = await this.expo.sendPushNotificationsAsync(messages);
-  const receiptIds = tickets
-  .filter(t => t.status === 'ok')
-  .map(t => (t as any).id)
-  .filter(Boolean);
 
-  if (receiptIds.length) {
-    const receipts = await this.expo.getPushNotificationReceiptsAsync(receiptIds);
-    for (const receiptId in receipts) {
-      const receipt = receipts[receiptId];
+  console.log('🎫 Expo tickets response:', tickets);
 
-      if (receipt.status === 'error') {
-        if (receipt.details?.error === 'DeviceNotRegistered') {
-          const badToken = messages.find(m => m.to === receiptId)?.to;
-          if (badToken) {
-            await this.removeInvalidToken(badToken as string);
-            console.warn('🧹 Dead token removed:', badToken);
-          }
-        }
-      }
-    }
-  }
+  console.log('================ PUSH DEBUG END =================');
 
-  console.log('✅ Notification attempt completed for user:', userId);
   return { success: true };
 }
 

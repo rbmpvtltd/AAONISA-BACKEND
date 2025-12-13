@@ -20,8 +20,10 @@ import { LikeController } from './like.controller';
 
 import { User } from '../users/entities/user.entity';   
 import { Video } from "../stream/entities/video.entity";
+import { TokenModule } from '../tokens/token.module';
+import { NotificationModule } from '../notifications/notification.module';
 @Module({
-  imports: [TypeOrmModule.forFeature([Like, User, Video])],
+  imports: [TypeOrmModule.forFeature([Like, User, Video]), TokenModule, NotificationModule],
   controllers:[LikeController],
   providers: [LikeService],
   exports: [LikeService],

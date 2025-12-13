@@ -10,8 +10,9 @@ import { SharedModule } from 'src/modules/shared/shared.module';
 import { UserProfile } from '../users/entities/user-profile.entity';
 import { UploadService } from '../upload/upload.service';
 import { TokenModule } from '../tokens/token.module';
+import { NotificationModule } from '../notifications/notification.module';
 @Module({
-  imports: [TypeOrmModule.forFeature([Follow, User,UserProfile]),TokenModule,SharedModule],
+  imports: [TypeOrmModule.forFeature([Follow, User,UserProfile]),TokenModule,SharedModule,NotificationModule],
   controllers: [FollowController],
   providers: [FollowService,UploadService],
   exports: [FollowService],
