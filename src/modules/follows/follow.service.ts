@@ -14,6 +14,8 @@ import { join } from 'path';
 import { lookup } from 'mime-types'
 import * as sharp from 'sharp';
 import { TokenService } from '../tokens/token.service';
+import { NotificationService } from '../notifications/notification.service';
+import { NotificationType } from '../notifications/entities/notification.entity';
 @Injectable()
 export class FollowService {
   constructor(
@@ -26,7 +28,8 @@ export class FollowService {
     private readonly userProFileRepository: Repository<UserProfile>,
     private readonly gateway: AppGateway,
     private readonly uploadService: UploadService,
-    private readonly tokenService: TokenService
+    private readonly tokenService: TokenService,
+    private readonly notificationService: NotificationService
   ) { }
 
   async followUser(followerId: string, followingId: string) {
@@ -64,17 +67,25 @@ export class FollowService {
       follower: userWhoFollow,
       following: userToFollow,
     });
-
     await this.followRepository.save(follow);
     try {
-       this.tokenService.sendNotification(
-        followingId,
-        'Followed',
-        `${userWhoFollow.username} followed you`
+      this.tokenService.sendNotification(
+        userToFollow.id,
+        'Hithoy',
+        `${userWhoFollow.username} followed you`,
+      );
+
+       this.notificationService.createNotification(
+        userToFollow,         
+        userWhoFollow,               
+        NotificationType.FOLLOW,      
+        `${userWhoFollow.username} followed you`,
+        userWhoFollow.id,               
       );
     } catch (err) {
       console.warn('Notification failed:', err.message);
     }
+
     return { message: 'Followed successfully', follow };
   }
 

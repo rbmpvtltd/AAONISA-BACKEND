@@ -6,10 +6,11 @@ import { User } from 'src/modules/users/entities/user.entity';
 import { CommentService } from './comments.service';
 import { CommentController } from './comments.controller';
 import { SharedModule } from 'src/modules/shared/shared.module';
-
+import { TokenModule } from '../tokens/token.module';
+import { NotificationModule } from '../notifications/notification.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Comment, Video, User]), SharedModule],
+  imports: [TypeOrmModule.forFeature([Comment, Video, User]), SharedModule,TokenModule, NotificationModule],
   providers: [CommentService],
   controllers: [CommentController],
   exports: [CommentService],

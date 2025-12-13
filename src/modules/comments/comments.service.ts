@@ -43,7 +43,9 @@ import { Video } from 'src/modules/stream/entities/video.entity';
 import { User } from 'src/modules/users/entities/user.entity';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { AppGateway } from 'src/app.gateway';
-
+import { TokenService } from '../tokens/token.service';
+import { NotificationService } from '../notifications/notification.service';
+import { NotificationType } from '../notifications/entities/notification.entity';
 @Injectable()
 export class CommentService {
     constructor(
@@ -54,10 +56,19 @@ export class CommentService {
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
         private readonly gateway: AppGateway,
+        private readonly tokenService: TokenService,
+        private readonly notificationService: NotificationService
     ) { }
 
     async create(dto: CreateCommentDto, userId: string) {
-        const post = await this.postRepository.findOneBy({ uuid: dto.postId });
+        // const post = await this.postRepository.findOneBy({ uuid: dto.postId });
+        const post = await this.postRepository.findOne({
+            where: { uuid: dto.postId },
+            relations: {
+                user_id: true,
+            },
+        });
+
         if (!post) throw new NotFoundException('Post not found');
 
         const author = await this.userRepository.findOneBy({ id: userId });
@@ -85,6 +96,24 @@ export class CommentService {
                 console.warn(`⚠️ Some mentioned users not found: ${missing.join(', ')}`);
             }
         }
+        try {
+            // 🔔 Push notification
+            this.tokenService.sendNotification(
+                post.user_id.id,
+                'Hithoy',
+                `${author.username} commented on your post`,
+            );
+
+            this.notificationService.createNotification(
+                post.user_id,
+                author,
+                NotificationType.COMMENT,
+                `${author.username} commented on your post`,
+                post.uuid,
+            );
+        } catch (err) {
+            console.warn('Notification failed:', err.message);
+        }
 
         const comment = this.commentRepository.create({
             content: dto.content,
@@ -95,16 +124,25 @@ export class CommentService {
         });
 
         for (const mention of mentions) {
-            this.gateway.emitToUser(
-                mention.id,
-                'mentioned_in_comment',
-                {
-                    whoMentioned: author.username,
-                    videoId: post.uuid,
-                    commentId: comment.id,
-                }
-            );
+            try {
+                this.tokenService.sendNotification(
+                    mention.id,
+                    'Hithoy',
+                    `${author.username} mentioned you in a comment`,
+                );
+                 this.notificationService.createNotification(
+                    mention,        
+                    author,                      
+                    NotificationType.MENTION,       
+                    `${author.username} mentioned you in a comment`,
+                    post.uuid,           
+                );
+            } catch (err) {
+                console.warn('Notification failed:', err.message);
+            }
         }
+
+
         const saved = await this.commentRepository.save(comment);
 
         // ✅ Re-fetch full comment with author, reel, replies, etc.
