@@ -292,6 +292,10 @@ import { Server, Socket } from "socket.io";
 import { Logger } from "@nestjs/common";
 import { ChatService } from "./modules/chat/chat.service";
 import { ViewService } from "./modules/views/view.service";
+import { TokenService } from "./modules/tokens/token.service";
+import { User } from "./modules/users/entities/user.entity";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
 interface JoinRoomPayload {
   roomId: string;
 }
@@ -324,7 +328,7 @@ export class AppGateway
   
   @WebSocketServer()
   server: Server;
-
+  
   private readonly logger = new Logger(AppGateway.name);
   
   // Maps userId to their current socketId
@@ -335,8 +339,8 @@ export class AppGateway
 
   // Track if gateway is initialized
   private isInitialized = false;
-
-  constructor(private readonly chatService: ChatService,private readonly viewService: ViewService) {}
+  constructor(private readonly chatService: ChatService,private readonly viewService: ViewService,private readonly tokenService: TokenService,@InjectRepository(User)
+  private readonly userRepo: Repository<User>) {}
   /* ========================================
      GATEWAY INITIALIZATION
   ======================================== */
@@ -439,7 +443,10 @@ export class AppGateway
       );
 
       const { sessionId, senderId, receiverId, text } = payload;
-
+      const sender = await this.userRepo.findOne({ where: { id: senderId } });
+      if(!sender) {
+        return 
+      }
       // Validate payload
       if (!sessionId || !senderId || !receiverId || !text) {
         this.logger.error(`[${requestId}] Invalid message payload`, payload);
@@ -456,6 +463,10 @@ export class AppGateway
 
       // Generate consistent room ID
       const roomId = this.generateRoomId(senderId, receiverId);
+if(!roomId) {
+  console.error(`[${requestId}] roomId is invalid`);
+  return;
+}
 
       // Emit to room
       this.server.to(roomId).emit("Message", {
@@ -465,15 +476,19 @@ export class AppGateway
         receiverId,
         createdAt: savedMessage.created_at,
       });
-
-      const duration = Date.now() - startTime;
-      this.logger.log(
-        `✅ [${requestId}] Message saved and emitted to room: ${roomId} (${duration}ms)`
-      );
+      let inSameRoom = await this.areBothUsersInRoom(roomId)
+      if(!inSameRoom) {
+        await this.tokenService.sendNotification(receiverId,"Hithoy",`${sender.username} sent you a chat`)
+      }
+      // const duration = Date.now() - startTime;
+      // this.logger.log(
+      //   `✅ [${requestId}] Message saved and emitted to room: ${roomId} (${duration}ms)`
+      // );
     } catch (error) {
       this.logger.error(`[${requestId}] Error handling sendMessage:`, error);
       client.emit("error", { message: "Failed to send message" });
     }
+    
   }
 
   @SubscribeMessage("getPreviousMessages")
@@ -645,6 +660,7 @@ async handleStoryView(
    * Generate consistent room ID for two users
    */
   private generateRoomId(user1Id: string, user2Id: string): string {
+    console.log("📥 Generating room ID for:", user1Id, user2Id);
     return [user1Id, user2Id].sort().join("-");
   }
 
@@ -722,4 +738,10 @@ async handleStoryView(
   getActiveUsers(): string[] {
     return Array.from(this.userSockets.keys());
   }
+
+  async areBothUsersInRoom(roomId: string): Promise<boolean> {
+  const socketsInRoom = await this.server.in(roomId).fetchSockets();
+  return socketsInRoom.length >= 2;
+}
+
 }

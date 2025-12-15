@@ -17,7 +17,9 @@ import { UploadService } from '../upload/upload.service';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { Follow } from '../follows/entities/follow.entity';
-
+import { TokenService } from '../tokens/token.service';
+import { NotificationService } from '../notifications/notification.service';
+import { NotificationType } from '../notifications/entities/notification.entity';
 const { createCanvas } = require('canvas');
 
 interface OverlayMetadata {
@@ -58,6 +60,9 @@ export class VideoService {
         private readonly hashtagCleanupQueue: Queue,
         @InjectRepository(Follow)
         private readonly followRepository: Repository<Follow>,
+
+        private readonly tokenService: TokenService,
+        private readonly notificationService: NotificationService
     ) { }
     private async checkIfVideoHasAudio(filePath: string): Promise<boolean> {
         return new Promise((resolve, reject) => {
@@ -901,6 +906,27 @@ export class VideoService {
                 }
             );
         }
+
+        for (const mention of mentionedUsers) {
+                    try {
+                        this.tokenService.sendNotification(
+                            mention.id,
+                            'Hithoy',
+                            `${user.username} mentioned you in a post`,
+                        );
+                         this.notificationService.createNotification(
+                            mention,        
+                            user,                      
+                            NotificationType.MENTION,       
+                            `${user.username} mentioned you in a post`,
+                            video.uuid,           
+                        );
+                    } catch (err) {
+                        console.warn('Notification failed:', err.message);
+                    }
+                }
+        
+        
 
         return "stream uploaded successfully";
     }
