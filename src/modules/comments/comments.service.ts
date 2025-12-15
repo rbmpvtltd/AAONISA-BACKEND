@@ -162,8 +162,10 @@ export class CommentService {
             relations: [
                 'author',
                 'replies',
+                'likedBy',
                 'replies.author',
                 'replies.author.userProfile',
+                'replies.likedBy',
                 'mentions',
                 'reel',
                 'author.userProfile',
