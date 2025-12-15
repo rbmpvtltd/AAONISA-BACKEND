@@ -11,8 +11,10 @@ import { SharedModule } from 'src/modules/shared/shared.module';
 import { UploadService } from '../upload/upload.service';
 import { BullModule } from '@nestjs/bull';
 import { Follow } from '../follows/entities/follow.entity';
+import { TokenModule } from '../tokens/token.module';
+import { NotificationModule } from '../notifications/notification.module';
 @Module({
-  imports: [TypeOrmModule.forFeature([Video, Audio,User,Hashtag,Follow]),UserProfileModule,BullModule.registerQueue({name:'story-delete'},{name:'hashtag-cleanup'}),SharedModule],
+  imports: [TypeOrmModule.forFeature([Video, Audio,User,Hashtag,Follow]),UserProfileModule,BullModule.registerQueue({name:'story-delete'},{name:'hashtag-cleanup'}),SharedModule,TokenModule,NotificationModule],
   controllers: [VideoController],
   providers: [VideoService,UploadService],
 })
