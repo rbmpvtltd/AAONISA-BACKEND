@@ -422,15 +422,36 @@ export class UserService {
     return { available: !user };
   }
 
+  // async allUusersDetails() {
+  //   const users = await this.userRepository.find({ relations: ['userProfile', 'videos', 'followers', 'following'], });
+
+  //   if (!users || users.length === 0) {
+  //     return { success: false, message: 'No users found' };
+  //   }
+
+  //   return users;
+  //   // return { success: true, message: 'Profile updated successfully',dataUri: userProfile.url};
+  // }
   async allUusersDetails() {
-    const users = await this.userRepository.find({ relations: ['userProfile'], });
+    const users = await this.userRepository.find({
+      relations: {
+        userProfile: true,
+        followers: true,
+        following: true,
+        videos: {
+          likes: true,
+          views: true,
+          comments: true,
+          reports: true,
+        },
+      },
+    });
 
     if (!users || users.length === 0) {
       return { success: false, message: 'No users found' };
     }
 
-    return users;
-    // return { success: true, message: 'Profile updated successfully',dataUri: userProfile.url};
+    return users
   }
 
   async getCurrentUser(userId: string) {
@@ -439,11 +460,13 @@ export class UserService {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['userProfile'],
+
     });
 
     if (!user) {
       return { success: false, message: 'User not found' };
     }
+
     return { success: true, userProfile: user };
   }
 
