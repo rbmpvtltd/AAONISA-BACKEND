@@ -22,7 +22,7 @@ export class Bookmark {
   @ManyToOne(() => User, (user) => user.bookmarks, { onDelete: 'CASCADE' })
   user: User;
 
-  @ManyToMany(() => Video, (reel) => reel.bookmarks, { cascade: true })
+  @ManyToMany(() => Video, (reel) => reel.bookmarks)
   @JoinTable({
     name: 'bookmark_reels',
     joinColumn: { name: 'bookmark_id', referencedColumnName: 'id' },

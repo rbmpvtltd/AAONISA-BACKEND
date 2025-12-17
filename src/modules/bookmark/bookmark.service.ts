@@ -192,6 +192,7 @@ export class BookmarkService {
     }
 
     async addReel(userId: string, dto: CreateBookmarkDto) {
+
         const user = await this.userRepo.findOne({
             where: { id: userId },
         });
@@ -202,9 +203,8 @@ export class BookmarkService {
             where: { name: dto.name, user: { id: userId } },
             relations: ['reels'], // important
         });
-
         if (!bookmark) throw new NotFoundException('Bookmark not found');
-
+        if(!dto.reelId) throw new BadRequestException('No reel IDs provided to add')
         // Nayi reels lao
         const newReels = await this.reelRepo.find({
             where: { uuid: dto.reelId },
@@ -214,7 +214,6 @@ export class BookmarkService {
 
         // Purani + nayi reels combine karo
         bookmark.reels = [...bookmark.reels, ...newReels];
-
         await this.bookmarkRepo.save(bookmark);
 
         return bookmark;
