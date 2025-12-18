@@ -442,6 +442,7 @@ export class UserService {
           likes: true,
           views: true,
           comments: true,
+          hashtags: true,
           reports: true,
         },
       },
