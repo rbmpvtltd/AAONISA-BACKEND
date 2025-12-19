@@ -16,7 +16,7 @@ export class ViewController {
   @Post('addview')
   async viewReel(@Body() dto: ViewDto, @Req() req: any) {
     const userId = req.user.userId;
-    console.log(userId, dto.storyId);
+    // console.log(userId, dto.storyId);
     return this.viewService.viewReel(userId, dto.storyId);
   }
 }

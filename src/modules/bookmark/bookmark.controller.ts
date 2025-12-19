@@ -58,11 +58,12 @@ export class BookmarkController {
 
     @UseGuards(JwtAuthGuard)
     @Post('deleteBookmark')
-    remove(@Body('id', ParseIntPipe) id: number, @Req() req) {
-        const payload = req.user;
-        const userId = payload?.sub || payload?.id || payload?.userId;
-        return this.bookmarkService.remove(userId, id);
-    }
+        remove(@Body('id', ParseIntPipe) id: number, @Req() req) {
+            console.log(id)
+            const payload = req.user;
+            const userId = payload?.sub || payload?.id || payload?.userId;
+            return this.bookmarkService.remove(userId, id);
+        }
 
 
     @UseGuards(JwtAuthGuard)
@@ -86,6 +87,6 @@ export class BookmarkController {
     removeReel(@Body() createBookmarkDto: CreateBookmarkDto, @Req() req) {
         const payload = req.user;
         const userId = payload?.sub || payload?.id || payload?.userId;
-        return this.bookmarkService.addReel(userId, createBookmarkDto);
+        return this.bookmarkService.removeReel(userId, createBookmarkDto);
     }
 }
