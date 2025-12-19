@@ -252,14 +252,14 @@ export class BookmarkService {
         const user = await this.userRepo.findOne({
             where: { id: userId },
         });
+        console.log("bookmark name ",dto)
         if (!user) throw new NotFoundException('User not found');
-
         const bookmark = await this.bookmarkRepo.findOne({
             where: { name: dto.name, user: { id: userId } },
             relations: ['reels'], // zaruri hai
         });
         if (!bookmark) throw new NotFoundException('Bookmark not found');
-
+        console.log("reelId ",dto.reelId)
         if (!dto.reelId?.length) {
             throw new BadRequestException('No reel IDs provided to remove');
         }
@@ -268,7 +268,6 @@ export class BookmarkService {
         if (!dto.reelId) throw new BadRequestException('No reel IDs provided to remove');
 
         bookmark.reels = bookmark.reels.filter((reel) => reel.uuid !== dto.reelId);
-
         await this.bookmarkRepo.save(bookmark);
 
         return {
