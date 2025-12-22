@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Deploy NestJS to VPS
 
 on:
   push:
@@ -10,26 +10,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Repo
         uses: actions/checkout@v3
 
-      - name: Copy files to EC2
-        uses: appleboy/scp-action@v0.1.7
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1
         with:
-          host: 13.233.234.74
-          username: ubuntu
-          key: ${{ secrets.CICD_KEY }}
-          source: "."
-          target: "/home/ubuntu/AAONISA-BACKEND"
-
-      - name: Run deployment commands
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: 13.233.234.74
-          username: ubuntu
-          key: ${{ secrets.CICD_KEY }}
+          host: 88.222.213.106
+          username: root
+          key: ${{secrets.VPS_SSH_KEY}}
           script: |
-            cd /home/ubuntu/AAONISA-BACKEND
-            git pull origin main
-            npm install --production
-            pm2 restart backend
+            # Load NVM
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm use 20  # ya specific version like nvm use 20
+            node -v
+            npm -v
+            echo "Deploying NestJS app..."
+            cd ~/office_work/AAONISA-BACKEND || exit 1
+            git pull origin main || { echo 'Git pull failed'; exit 1; }
+            npm install || { echo 'npm install failed'; exit 1; }
+            npm run build || { echo 'Build failed'; exit 1; }
+            pm2 restart backend || { echo 'PM2 restart failed'; exit 1; }
+            echo "Deployment finished successfully ✅"
+            

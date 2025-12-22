@@ -1284,6 +1284,13 @@ async processVideoJob(data: {
             .leftJoinAndSelect('video.likes', 'likes')
             .leftJoinAndSelect('video.comments', 'comments')
             .leftJoinAndSelect('video.views', 'views')
+            .leftJoin(
+                'video.likes',
+                'myLike',
+                'myLike.user.id = :userId',
+                { userId }
+            )
+
             .where('video.type != :storyType', { storyType: 'story' });
 
         /* ================= FEED TYPE LOGIC ================= */
@@ -1426,6 +1433,7 @@ async processVideoJob(data: {
     }
 
 
+
     async deleteVideoById(uuid: string) {
         const video = await this.videoRepository.findOne({ where: { uuid } });
         if (!video) throw new NotFoundException('Video not found');
@@ -1434,3 +1442,5 @@ async processVideoJob(data: {
         return { success: true };
     }
 }
+
+

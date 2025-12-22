@@ -18,11 +18,15 @@ import { Response } from 'express';
 import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
 import { BlockUserDto } from './dto/block.dto';
 import { BlockService } from './block.service';
-
-import * as path from 'path';
+import { VideoService } from '../stream/stream.service';
+import { User } from './entities/user.entity';
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService, private readonly blockService: BlockService) { }
+  constructor(
+    private readonly userService: UserService,
+    private readonly videosService: UserService,
+     private readonly blockService: BlockService
+    ) { }
 
   @Post('register-check')
   registerCheck(@Body() dto: PreRegisterDto) {
@@ -97,15 +101,64 @@ export class UserController {
   }
 
   @Post("check-username")
-  async checkUsername(@Body() username: string ) {
+  async checkUsername(@Body() username: string) {
     return await this.userService.checkUsername(username);
   }
-  
-  @UseGuards(JwtAuthGuard)
-  @Get('all-users')
-  async allUusersDetails() {
-    return this.userService.allUusersDetails();
-  }
+
+  // @UseGuards(JwtAuthGuard)
+  // @Get('all-users')
+  // async allUusersDetails() {
+  //   return this.userService.allUusersDetails();
+  // }
+
+  // admin panel to get all users
+@Get('all-users')
+getAllUsers(
+  @Query('page') page = 1,
+  @Query('limit') limit = 10,
+  @Query('search') search?: string,
+) {
+  return this.userService.allUsersDetails(
+    Number(page),
+    Number(limit),
+    search
+  );
+}
+
+// videos.controller.ts
+@Get('all-videos')
+async getAllVideos(
+  @Query('page') page: string = '1',
+  @Query('limit') limit: string = '12',
+  @Query('search') search?: string,
+  @Query('hashtag') hashtag?: string,
+  @Query('startDate') startDate?: string,
+  @Query('endDate') endDate?: string,
+  @Query('type') videoType?: string,
+) {
+
+    console.log('Received filters:', {
+    page,
+    limit,
+    search,
+    hashtag,
+    startDate,
+    endDate,
+    videoType
+  });
+
+  return this.videosService.getAllVideos(
+    parseInt(page),
+    parseInt(limit),
+    search,
+    hashtag,
+    startDate,
+    endDate,
+    videoType
+  );
+}
+
+// ===========================================================
 
   @UseGuards(JwtAuthGuard)
   @Get('profile/current')
