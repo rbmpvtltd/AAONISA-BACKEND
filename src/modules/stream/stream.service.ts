@@ -908,25 +908,25 @@ export class VideoService {
         }
 
         for (const mention of mentionedUsers) {
-                    try {
-                        this.tokenService.sendNotification(
-                            mention.id,
-                            'Hithoy',
-                            `${user.username} mentioned you in a post`,
-                        );
-                         this.notificationService.createNotification(
-                            mention,        
-                            user,                      
-                            NotificationType.MENTION,       
-                            `${user.username} mentioned you in a post`,
-                            video.uuid,           
-                        );
-                    } catch (err) {
-                        console.warn('Notification failed:', err.message);
-                    }
-                }
-        
-        
+            try {
+                this.tokenService.sendNotification(
+                    mention.id,
+                    'Hithoy',
+                    `${user.username} mentioned you in a post`,
+                );
+                this.notificationService.createNotification(
+                    mention,
+                    user,
+                    NotificationType.MENTION,
+                    `${user.username} mentioned you in a post`,
+                    video.uuid,
+                );
+            } catch (err) {
+                console.warn('Notification failed:', err.message);
+            }
+        }
+
+
 
         return "stream uploaded successfully";
     }
@@ -1088,7 +1088,7 @@ export class VideoService {
     //     feedType: 'followings' | 'news' | 'explore',
     //     page = 1,
     //     limit = 10,
-        
+
     // ) {
     //     const skip = (page - 1) * limit;
     //     const query = this.videoRepository
@@ -1160,98 +1160,98 @@ export class VideoService {
     //     };
     // }
     async getVideosFeed(
-  userId: string,
-  feedType: 'followings' | 'news' | 'explore',
-  page = 1,
-  limit = 10,
-  random = false // 👈 NEW FLAG
-) {
-  const skip = (page - 1) * limit;
+        userId: string,
+        feedType: 'followings' | 'news' | 'explore',
+        page = 1,
+        limit = 10,
+        random = false // 👈 NEW FLAG
+    ) {
+        const skip = (page - 1) * limit;
 
-  const query = this.videoRepository
-    .createQueryBuilder('video')
-    .leftJoinAndSelect('video.user_id', 'user')
-    .leftJoinAndSelect('user.userProfile', 'userProfile')
-    .leftJoinAndSelect('video.audio', 'audio')
-    .leftJoinAndSelect('video.hashtags', 'hashtags')
-    .leftJoinAndSelect('video.likes', 'likes')
-    .leftJoinAndSelect('video.comments', 'comments')
-    .leftJoinAndSelect('video.views', 'views')
-    .where('video.type != :storyType', { storyType: 'story' });
+        const query = this.videoRepository
+            .createQueryBuilder('video')
+            .leftJoinAndSelect('video.user_id', 'user')
+            .leftJoinAndSelect('user.userProfile', 'userProfile')
+            .leftJoinAndSelect('video.audio', 'audio')
+            .leftJoinAndSelect('video.hashtags', 'hashtags')
+            .leftJoinAndSelect('video.likes', 'likes')
+            .leftJoinAndSelect('video.comments', 'comments')
+            .leftJoinAndSelect('video.views', 'views')
+            .where('video.type != :storyType', { storyType: 'story' });
 
-  /* ================= FEED TYPE LOGIC ================= */
+        /* ================= FEED TYPE LOGIC ================= */
 
-  if (feedType === 'followings') {
-    const followings = await this.followRepository.find({
-      where: { follower: { id: userId } },
-      relations: ['following'],
-    });
+        if (feedType === 'followings') {
+            const followings = await this.followRepository.find({
+                where: { follower: { id: userId } },
+                relations: ['following'],
+            });
 
-    const followingIds = followings.map(f => f.following.id);
+            const followingIds = followings.map(f => f.following.id);
 
-    if (!followingIds.length) {
-      return { data: [], page, limit, total: 0, totalPages: 0 };
+            if (!followingIds.length) {
+                return { data: [], page, limit, total: 0, totalPages: 0 };
+            }
+
+            query.andWhere('video.user_id IN (:...followingIds)', { followingIds });
+
+        } else if (feedType === 'news') {
+            query.andWhere('video.type = :newsType', { newsType: 'news' });
+
+        } else if (feedType === 'explore') {
+            query.andWhere(
+                '(video.type = :reelsType OR video.type = :newsType)',
+                { reelsType: 'reels', newsType: 'news' }
+            );
+        }
+
+        /* ================= ORDERING LOGIC ================= */
+
+        if (random) {
+            // PostgreSQL → RANDOM(), MySQL → RAND()
+            query.orderBy('RANDOM()');
+        } else {
+            query.orderBy('video.created_at', 'DESC');
+        }
+
+        /* ================= PAGINATION ================= */
+
+        query.skip(skip).take(limit);
+
+        const [videos, total] = await query.getManyAndCount();
+
+        /* ================= RESPONSE FORMAT ================= */
+
+        const formatted = videos.map(v => ({
+            id: v.uuid,
+            title: v.title,
+            caption: v.caption,
+            videoUrl: v.videoUrl,
+            type: v.type,
+            created_at: v.created_at,
+            thumbnailUrl: v.thumbnailUrl,
+            duration: v.duration || 15,
+            user: {
+                id: v.user_id.id,
+                username: v.user_id.username,
+                profilePic: v.user_id.userProfile?.ProfilePicture || '',
+            },
+            audio: v.audio ? { id: v.audio.uuid, title: v.audio.name } : null,
+            hashtags: v.hashtags?.map(h => h.tag) || [],
+            likesCount: v.likes?.length || 0,
+            viewsCount: v.views?.length || 0,
+            commentsCount: v.comments?.length || 0,
+        }));
+
+        return {
+            data: formatted,
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+            random, // 👈 helpful for frontend
+        };
     }
-
-    query.andWhere('video.user_id IN (:...followingIds)', { followingIds });
-
-  } else if (feedType === 'news') {
-    query.andWhere('video.type = :newsType', { newsType: 'news' });
-
-  } else if (feedType === 'explore') {
-    query.andWhere(
-      '(video.type = :reelsType OR video.type = :newsType)',
-      { reelsType: 'reels', newsType: 'news' }
-    );
-  }
-
-  /* ================= ORDERING LOGIC ================= */
-
-  if (random) {
-    // PostgreSQL → RANDOM(), MySQL → RAND()
-    query.orderBy('RANDOM()');
-  } else {
-    query.orderBy('video.created_at', 'DESC');
-  }
-
-  /* ================= PAGINATION ================= */
-
-  query.skip(skip).take(limit);
-
-  const [videos, total] = await query.getManyAndCount();
-
-  /* ================= RESPONSE FORMAT ================= */
-
-  const formatted = videos.map(v => ({
-    id: v.uuid,
-    title: v.title,
-    caption: v.caption,
-    videoUrl: v.videoUrl,
-    type: v.type,
-    created_at: v.created_at,
-    thumbnailUrl: v.thumbnailUrl,
-    duration: v.duration || 15,
-    user: {
-      id: v.user_id.id,
-      username: v.user_id.username,
-      profilePic: v.user_id.userProfile?.ProfilePicture || '',
-    },
-    audio: v.audio ? { id: v.audio.uuid, title: v.audio.name } : null,
-    hashtags: v.hashtags?.map(h => h.tag) || [],
-    likesCount: v.likes?.length || 0,
-    viewsCount: v.views?.length || 0,
-    commentsCount: v.comments?.length || 0,
-  }));
-
-  return {
-    data: formatted,
-    page,
-    limit,
-    total,
-    totalPages: Math.ceil(total / limit),
-    random, // 👈 helpful for frontend
-  };
-}
 
     async getExploreVideosWithMain(
         videoId: string,
@@ -1318,6 +1318,7 @@ export class VideoService {
         };
     }
 
+    
 
     async deleteVideoById(uuid: string) {
         const video = await this.videoRepository.findOne({ where: { uuid } });

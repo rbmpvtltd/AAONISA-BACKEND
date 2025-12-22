@@ -432,28 +432,175 @@ export class UserService {
   //   return users;
   //   // return { success: true, message: 'Profile updated successfully',dataUri: userProfile.url};
   // }
-  async allUusersDetails() {
-    const users = await this.userRepository.find({
-      relations: {
-        userProfile: true,
-        followers: true,
-        following: true,
-        videos: {
-          likes: true,
-          views: true,
-          comments: true,
-          hashtags: true,
-          reports: true,
-        },
-      },
-    });
+  // async allUusersDetails() {
+  //   const users = await this.userRepository.find({
+  //     relations: {
+  //       userProfile: true,
+  //       followers: true,
+  //       following: true,
+  //       videos: {
+  //         likes: true,
+  //         views: true,
+  //         comments: true,
+  //         hashtags: true,
+  //         mentions: true,
+  //         reports: true,
+  //       },
+  //     },
+  //   });
 
-    if (!users || users.length === 0) {
-      return { success: false, message: 'No users found' };
+  //   if (!users || users.length === 0) {
+  //     return { success: false, message: 'No users found' };
+  //   }
+
+  //   return users
+  // }
+
+  // for admin panel api
+  async allUsersDetails(
+    page = 1,
+    limit = 10,
+    search?: string
+  ) {
+    const qb = this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.userProfile', 'profile')
+      .leftJoinAndSelect('user.followers', 'followers')
+      .leftJoinAndSelect('user.following', 'following')
+      .leftJoinAndSelect('user.videos', 'videos')
+      .leftJoinAndSelect('videos.likes', 'likes')
+      .leftJoinAndSelect('videos.views', 'views')
+      .leftJoinAndSelect('videos.comments', 'comments')
+      .leftJoinAndSelect('videos.hashtags', 'hashtags')
+      .leftJoinAndSelect('videos.mentions', 'mentions')
+      .leftJoinAndSelect('videos.reports', 'reports');
+
+    // 🔍 GLOBAL SEARCH (FULL DB)
+    if (search) {
+      qb.andWhere(
+        `
+    profile.name ILIKE :search
+    OR user.username ILIKE :search
+    OR user.email ILIKE :search
+    OR user.phone_no ILIKE :search
+    `,
+        { search: `%${search}%` }
+      );
     }
 
-    return users
+
+    // 🔢 Total count (with search)
+    const totalCount = await qb.getCount();
+
+    // 📄 Pagination
+    qb.skip((page - 1) * limit).take(limit);
+
+    const users = await qb.getMany();
+
+    return {
+      success: true,
+      data: users,
+      totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      currentPage: page,
+      pageSize: limit,
+    };
   }
+
+
+  // videos.service.ts
+  async getAllVideos(
+    page = 1,
+    limit = 10,
+    search?: string,
+    hashtag?: string,
+    startDate?: string,
+    endDate?: string,
+    videoType?: string
+  ) {
+    const qb = this.videoRepository
+      .createQueryBuilder('video')
+      .leftJoinAndSelect('video.user_id', 'user')
+      .leftJoinAndSelect('user.userProfile', 'profile')
+      .leftJoinAndSelect('video.likes', 'likes')
+      .leftJoinAndSelect('video.views', 'views')
+      .leftJoinAndSelect('video.comments', 'comments')
+      .leftJoinAndSelect('video.hashtags', 'hashtags')
+      .leftJoinAndSelect('video.mentions', 'mentions')
+      .leftJoinAndSelect('video.reports', 'reports');
+
+    //  IMPORTANT: Exclude stories and archived
+    qb.where('video.type != :storyType', { storyType: 'story' });
+    qb.andWhere('(video.archived IS NULL OR video.archived = :archived)', { archived: false });
+
+    // 🔍 USERNAME/EMAIL SEARCH
+    if (search) {
+      qb.andWhere(
+        `(
+        user.username ILIKE :search
+        OR user.email ILIKE :search
+        OR profile.name ILIKE :search
+      )`,
+        { search: `%${search}%` }
+      );
+    }
+
+    //  HASHTAG FILTER (FIXED - with proper join)
+    if (hashtag) {
+      qb.andWhere(
+        `EXISTS (
+        SELECT 1 FROM video_hashtags_hashtag vh
+        INNER JOIN hashtag h ON vh."hashtagId" = h.id
+        WHERE vh."videoUuid" = video.uuid
+        AND h.tag ILIKE :hashtag
+      )`,
+        { hashtag: `%${hashtag}%` }
+      );
+    }
+
+    // VIDEO TYPE FILTER
+    if (videoType && (videoType === 'reels' || videoType === 'news')) {
+      qb.andWhere('video.type = :videoType', { videoType });
+    }
+
+    // DATE RANGE FILTER
+    if (startDate && endDate) {
+      qb.andWhere('video.created_at BETWEEN :startDate AND :endDate', {
+        startDate: `${startDate} 00:00:00`,
+        endDate: `${endDate} 23:59:59`,
+      });
+    } else if (startDate) {
+      qb.andWhere('video.created_at >= :startDate', {
+        startDate: `${startDate} 00:00:00`,
+      });
+    } else if (endDate) {
+      qb.andWhere('video.created_at <= :endDate', {
+        endDate: `${endDate} 23:59:59`,
+      });
+    }
+
+    // Sort by newest first
+    qb.orderBy('video.created_at', 'DESC');
+
+    // Get total count BEFORE pagination
+    const totalCount = await qb.getCount();
+
+    // Apply pagination
+    qb.skip((page - 1) * limit).take(limit);
+
+    // Get videos
+    const videos = await qb.getMany();
+
+    return {
+      success: true,
+      data: videos,
+      totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      currentPage: page,
+      pageSize: limit,
+    };
+  }
+  // ===========================================================
 
   async getCurrentUser(userId: string) {
     // const user = await this.userRepository.findOneBy({ id: userId }) ;
