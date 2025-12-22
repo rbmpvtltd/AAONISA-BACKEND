@@ -1177,6 +1177,13 @@ export class VideoService {
             .leftJoinAndSelect('video.likes', 'likes')
             .leftJoinAndSelect('video.comments', 'comments')
             .leftJoinAndSelect('video.views', 'views')
+            .leftJoin(
+                'video.likes',
+                'myLike',
+                'myLike.user.id = :userId',
+                { userId }
+            )
+
             .where('video.type != :storyType', { storyType: 'story' });
 
         /* ================= FEED TYPE LOGIC ================= */
@@ -1318,7 +1325,7 @@ export class VideoService {
         };
     }
 
-    
+
 
     async deleteVideoById(uuid: string) {
         const video = await this.videoRepository.findOne({ where: { uuid } });
@@ -1328,3 +1335,5 @@ export class VideoService {
         return { success: true };
     }
 }
+
+
