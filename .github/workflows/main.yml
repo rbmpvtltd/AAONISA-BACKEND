@@ -18,14 +18,7 @@ jobs:
         with:
           host: 88.222.213.106
           username: root
-          key: |
-            -----BEGIN OPENSSH PRIVATE KEY-----
-            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-            QyNTUxOQAAACBbqYUExP7SvuyWcUsYZW1qEB7+JFB5y7+z8UFdSrD+hAAAAKDyVkKB8lZC
-            gQAAAAtzc2gtZWQyNTUxOQAAACBbqYUExP7SvuyWcUsYZW1qEB7+JFB5y7+z8UFdSrD+hA
-            AAAECDOGXy0E1hDA6UBOEPkMk6JZ7o6etURTtOqOWFV/qMBFuphQTE/tK+7JZxSxhlbWoQ
-            Hv4kUHnLv7PxQV1KsP6EAAAAHGphaWVudGVycHJpc2VzNzg5MEBnbWFpbC5jb20B
-            -----END OPENSSH PRIVATE KEY-----
+          key: ${{secrets.VPS_SSH_KEY}}
           script: |
             # Load NVM
             export NVM_DIR="$HOME/.nvm"
