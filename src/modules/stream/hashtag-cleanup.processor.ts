@@ -4,16 +4,19 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Video } from 'src/modules/stream/entities/video.entity';
 import { Hashtag } from 'src/modules/stream/entities/hashtag.entity';
 import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
-@Processor('hashtagCleanup')
+@Processor('hashtag-cleanup')
 export class HashtagCleanupProcessor {
   private readonly logger = new Logger(HashtagCleanupProcessor.name);
 
   constructor(
+    @InjectRepository(Video)
     private readonly videoRepository: Repository<Video>,
+
+    @InjectRepository(Hashtag)
     private readonly hashtagRepo: Repository<Hashtag>,
-    // inject manager/repo via @InjectRepository if using TypeORM
   ) {}
 
   @Process('removeVideoFromHashtags')
