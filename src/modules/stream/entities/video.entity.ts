@@ -73,6 +73,8 @@ export class Video {
   @Column({ default: false })
   archived: boolean;
 
+  @Column({ default: 'pending' })
+  status: 'pending' | 'uploaded' | 'failed';
   // ---------------- RELATIONS -----------------
   @OneToMany(() => Like, (like) => like.reel, { cascade: true })
   likes: Like[];

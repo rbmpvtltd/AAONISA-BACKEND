@@ -22,9 +22,23 @@ import { ViewModule } from "./modules/views/view.module";
 import { TestController } from "./test/test.controller";
 import { SharedModule } from 'src/modules/shared/shared.module'
 import { ReportModule } from "./modules/reports/report.module";
+import { StoryDeleteModule } from "./modules/stream/story-delete.module";
+import { BullModule } from '@nestjs/bull';
 @Module({
 	imports: [
 		ConfigModule.forRoot({ isGlobal: true }),
+		BullModule.forRoot({
+			redis: {
+				host: process.env.REDIS_HOST,
+				port: Number(process.env.REDIS_PORT),
+				// username: process.env.REDIS_USERNAME,
+				password: process.env.REDIS_PASSWORD,
+				// tls: {},
+				// maxRetriesPerRequest: null,
+				// enableReadyCheck: false,
+			},
+		}),
+
 		TypeOrmModule.forRootAsync({
 			useFactory: () => {
 				const { entities, migrations, ...rest } = AppDataSource.options;
@@ -49,6 +63,7 @@ import { ReportModule } from "./modules/reports/report.module";
 		TokenModule,
 		ChatModule,
 		ReportModule,
+		StoryDeleteModule,
 		TypeOrmModule.forFeature([Bookmark, Comment]),
 	],
 	controllers: [TestController],
@@ -57,4 +72,4 @@ import { ReportModule } from "./modules/reports/report.module";
 })
 
 // checking ci/cd
-export class AppModule {}
+export class AppModule { }

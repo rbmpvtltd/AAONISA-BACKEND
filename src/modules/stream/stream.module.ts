@@ -13,9 +13,14 @@ import { BullModule } from '@nestjs/bull';
 import { Follow } from '../follows/entities/follow.entity';
 import { TokenModule } from '../tokens/token.module';
 import { NotificationModule } from '../notifications/notification.module';
+import { StoryDeleteModule } from './story-delete.module';
+import { VideoQueueProcessor } from './video.quere.processor';
 @Module({
-  imports: [TypeOrmModule.forFeature([Video, Audio,User,Hashtag,Follow]),UserProfileModule,BullModule.registerQueue({name:'story-delete'},{name:'hashtag-cleanup'}),SharedModule,TokenModule,NotificationModule],
+  imports: [TypeOrmModule.forFeature([Video, Audio,User,Hashtag,Follow]),UserProfileModule,SharedModule,TokenModule,NotificationModule,StoryDeleteModule,
+  BullModule.registerQueue({
+            name : 'videoProcessing'
+        }),],
   controllers: [VideoController],
-  providers: [VideoService,UploadService],
+  providers: [VideoService,UploadService,VideoQueueProcessor],
 })
 export class StreamModule {}

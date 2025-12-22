@@ -6,7 +6,6 @@ import { HashtagCleanupProcessor } from './hashtag-cleanup.processor';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Video } from 'src/modules/stream/entities/video.entity';
 import { Hashtag } from './entities/hashtag.entity';
-
 @Module({
     imports: [
         BullModule.registerQueue({
@@ -15,6 +14,9 @@ import { Hashtag } from './entities/hashtag.entity';
         BullModule.registerQueue({
             name: 'hashtag-cleanup',
         }),
+        // BullModule.registerQueue({
+        //     name : 'videoProcessing'
+        // }),
         TypeOrmModule.forFeature([Hashtag]),
         TypeOrmModule.forFeature([Video]),
     ],

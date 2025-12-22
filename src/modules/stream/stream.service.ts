@@ -44,6 +44,8 @@ interface ProcessVideoOptions {
 @Injectable()
 export class VideoService {
     constructor(
+        @InjectQueue('videoProcessing')
+        private readonly videoQueue: Queue,
         @InjectRepository(Video)
         private readonly videoRepository: Repository<Video>,
         @InjectRepository(User)
@@ -157,44 +159,6 @@ export class VideoService {
                 overlays.push({ id: 'dummy', text: 'dummy', x: 0, y: 0, scale: 1, rotation: 0, fontSize: 72, color: 'transparent' });
 
                 const overlayPaths: string[] = [];
-
-                // const generateOverlay = (text: string, overlay: any, index: number) => {
-                //     const { fontSize, color, rotation } = overlay;
-
-                //     // 1. Temporary canvas to measure text accurately
-                //     const tempCanvas = createCanvas(1, 1);
-                //     const tempCtx = tempCanvas.getContext('2d');
-                //     tempCtx.font = `${fontSize*2}px Arial`;
-
-                //     const metrics = tempCtx.measureText(text);
-                //     const textWidth = metrics.width;
-                //     const textHeight = (metrics.actualBoundingBoxAscent || fontSize) +
-                //         (metrics.actualBoundingBoxDescent || 0);
-
-                //     const rotatedWidth = Math.abs(textWidth * Math.cos(rotation)) + Math.abs(textHeight * Math.sin(rotation));
-                //     const rotatedHeight = Math.abs(textWidth * Math.sin(rotation)) + Math.abs(textHeight * Math.cos(rotation));
-
-                //     // 3. Create final canvas
-                //     const canvas = createCanvas(rotatedWidth, rotatedHeight);
-                //     const ctx = canvas.getContext('2d');
-
-                //     // 4. Translate to center and rotate
-                //     ctx.translate(rotatedWidth / 2, rotatedHeight / 2);
-                //     ctx.rotate(rotation);
-
-                //     // 5. Draw text centered
-                //     ctx.fillStyle = color;
-                //     ctx.font = `${fontSize*2}px Arial`;
-                //     ctx.textAlign = 'center';
-                //     ctx.textBaseline = 'middle';
-                //     ctx.fillText(text, 0, 0);
-
-                //     // 6. Save PNG
-                //     const overlayPath = path.join(process.cwd(), `overlay_${index}.png`);
-                //     fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
-
-                //     return overlayPath;
-                // };
                 const generateOverlay = (text: string, overlay: any, index: number): string => {
                     const { fontSize, color, rotation } = overlay;
 
@@ -231,9 +195,13 @@ export class VideoService {
                     ctx.fillText(text, 0, 0);
 
                     // 6. Save PNG
-                    const overlayPath = path.join(process.cwd(), `overlay_${index}.png`);
-                    fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
-
+                    const crypto = require('crypto');
+                    const uniqueId = crypto.randomBytes(4).toString('hex');
+                    const overlayPath = path.join(
+                        process.cwd(),
+                        `overlay_${process.pid}_${Date.now()}_${uniqueId}.png`
+                    );
+                    fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'))
                     return overlayPath;
                 };
                 overlays.forEach((ov, i) => {
@@ -251,15 +219,6 @@ export class VideoService {
                 const filterComplex: any[] = [];
                 let lastOutput = 'v0';
 
-                // if (filterColor && filterColor.toLowerCase() !== 'transparent') {
-                //     filterComplex.push({
-                //         filter: 'colorchannelmixer',
-                //         options: this.hexToMixer(filterColor),
-                //         outputs: 'v0'
-                //     });
-                // } else {
-                //     lastOutput = '0:v';
-                // }
 
                 if (
                     filterColor &&
@@ -656,281 +615,429 @@ export class VideoService {
     //     return "stream uploaded succsessfully";
     // }
 
+    // async create(createVideoDto: CreateVideoDto, filename: string, userId: string) {
+    //     try {
+    //         const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    //         if (!user) {
+    //             throw new BadRequestException('User not found. Invalid token.');
+    //         }
+
+    //         const videoPath = path.join(process.cwd(), 'src', 'uploads', 'videos', filename);
+    //         let videoDuration = createVideoDto.duration || 15;
+
+    //         if (!createVideoDto.duration) {
+    //             try {
+    //                 videoDuration = await this.getVideoDuration(videoPath);
+    //                 console.log(`Calculated video duration: ${videoDuration}s`);
+    //             } catch (err) {
+    //                 console.warn('Could not get video duration, using default 15s:', err.message);
+    //                 videoDuration = 15;
+    //             }
+    //         }
+
+    //         let audio: Audio | null = null;
+    //         if (createVideoDto.music && uuidValidate(createVideoDto.music.id)) {
+    //             try {
+    //                 audio = await this.audioRepository.findOneOrFail({
+    //                     where: { uuid: createVideoDto.music.id },
+    //                 });
+    //             } catch (err) {
+    //                 console.warn('AudioId invalid or not found. Attempting to extract from video...');
+    //             }
+    //         }
+
+    //         if (!audio && createVideoDto.music) {
+    //             const audioFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.mp3`;
+    //             const audioPath = path.join(process.cwd(), 'src', 'uploads', 'audios', audioFilename);
+
+    //             const audioFolder = path.dirname(audioPath);
+    //             if (!fs.existsSync(audioFolder)) {
+    //                 fs.mkdirSync(audioFolder, { recursive: true });
+    //             }
+
+    //             const hasAudio = await this.checkIfVideoHasAudio(videoPath);
+    //             if (hasAudio) {
+    //                 await this.extractAudioFromVideo(videoPath, audioPath);
+
+    //                 const uploadedAudio = await this.uploadService.uploadFile(audioPath, 'audios');
+    //                 audio = this.audioRepository.create({
+    //                     uuid: uuidv4(),
+    //                     name: uploadedAudio.publicUrl,
+    //                     category: 'auto-extracted',
+    //                     author: userId,
+    //                 });
+
+    //                 await this.audioRepository.save(audio);
+    //                 fs.unlinkSync(audioPath);
+    //             }
+    //         }
+
+    //         const overlayHashtags = createVideoDto.overlays
+    //             .filter(item => item.text.startsWith('#'))
+    //             .map(item => item.text);
+    //         const overlayMentions = createVideoDto.overlays
+    //             .filter(item => item.text.startsWith('@'))
+    //             .map(item => item.text);
+
+    //         const normalizedTags = ([...overlayHashtags, ...createVideoDto.hashtags || []])
+    //             .map((tag: string) => tag.trim().toLowerCase().replace(/^#/, ''));
+
+    //         const existingTags = await this.hashtagRepo.find({
+    //             where: normalizedTags.map((tag) => ({ tag })),
+    //         });
+    //         const existingTagNames = existingTags.map((t) => t.tag);
+    //         const newTags = normalizedTags
+    //             .filter((tag) => !existingTagNames.includes(tag))
+    //             .map((tag) => this.hashtagRepo.create({ tag }));
+
+    //         const overallTags = [...new Set([...existingTags, ...newTags])];
+
+    //         let mentionedUsers: User[] = [];
+    //         let mentionsArray: string[] = [];
+    //         let tempMentionsArray: string[] = [];
+    //         if (createVideoDto.mentions || overlayMentions) {
+    //             try {
+    //                 if (typeof createVideoDto.mentions === 'string') {
+    //                     tempMentionsArray = JSON.parse(createVideoDto.mentions);
+    //                 } else if (Array.isArray(createVideoDto.mentions)) {
+    //                     tempMentionsArray = createVideoDto.mentions;
+    //                 }
+    //                 if (Array.isArray(tempMentionsArray)) {
+    //                     mentionsArray = tempMentionsArray;
+    //                 }
+    //                 if (overlayMentions && Array.isArray(overlayMentions)) {
+    //                     mentionsArray = [...mentionsArray, ...overlayMentions];
+    //                 }
+    //             } catch (err) {
+    //                 throw new BadRequestException('Mentions must be a valid JSON array of usernames.');
+    //             }
+    //         }
+
+    //         if (mentionsArray.length) {
+    //             mentionedUsers = await this.userRepository.findBy({
+    //                 username: In(mentionsArray),
+    //             });
+
+    //             const foundUsernames = mentionedUsers.map((u) => u.username);
+    //             const missing = mentionsArray.filter((u) => !foundUsernames.includes(u));
+
+    //             if (missing.length) {
+    //                 console.warn(`Ignored invalid mentions: ${missing.join(', ')}`);
+    //             }
+    //         }
+
+    //         let externalAudioSrc = '';
+    //         if (createVideoDto.music && !uuidValidate(createVideoDto.music.id)) {
+    //             externalAudioSrc = createVideoDto.music.uri || '';
+    //         }
+
+    //         await this.compressVideoOverwrite(videoPath);
+    //         const compressedPath = path.join(
+    //             path.dirname(videoPath),
+    //             `compressed_${path.basename(videoPath)}`
+    //         );
+
+    //         let uploadPath;
+    //         const processedFilename = `${filename}`;
+    //         const processedPath = path.join(process.cwd(), 'src', 'uploads', 'processedVideos', processedFilename);
+
+    //         await this.processVideo({
+    //             inputPath: compressedPath,
+    //             outputPath: processedPath,
+    //             trimStart: Number(createVideoDto.trimStart) || 0,
+    //             trimEnd: Number(createVideoDto.trimEnd) || 0,
+    //             filterColor: createVideoDto.filter || 'transparent',
+    //             overlays: createVideoDto.overlays || [],
+    //         });
+
+    //         let uploadFolder: string;
+    //         if (createVideoDto.type === VideoType.story) {
+    //             uploadFolder = 'stories';
+    //         } else if (createVideoDto.type === VideoType.reels) {
+    //             uploadFolder = 'reels';
+    //         } else {
+    //             uploadFolder = 'news';
+    //         }
+
+    //         uploadPath = await this.uploadService.uploadFile(processedPath, uploadFolder);
+    //         if (processedPath) {
+    //             fs.unlinkSync(processedPath);
+    //         }
+
+    //         let thumbnailPublicUrl = '';
+    //         try {
+    //             const thumbnailPath = await this.generateThumbnail(compressedPath);
+    //             const uploadedThumb = await this.uploadService.uploadFile(thumbnailPath, 'thumbnails');
+    //             thumbnailPublicUrl = uploadedThumb.publicUrl;
+    //             if (thumbnailPath) {
+    //                 fs.unlinkSync(thumbnailPath);
+    //             }
+    //         } catch (err) {
+    //             console.warn('Thumbnail generation failed:', err.message);
+    //         }
+
+    //         if (videoPath) {
+    //             fs.unlinkSync(videoPath);
+    //         }
+    //         if (compressedPath) {
+    //             fs.unlinkSync(compressedPath);
+    //         }
+    //         filename = processedFilename;
+
+    //         const video = this.videoRepository.create({
+    //             title: createVideoDto.title,
+    //             caption: createVideoDto.caption,
+    //             type: createVideoDto.type || VideoType.reels,
+    //             externalAudioSrc: externalAudioSrc,
+    //             hashtags: overallTags,
+    //             user_id: user,
+    //             audio: audio || null,
+    //             videoUrl: uploadPath.publicUrl,
+    //             mentions: mentionedUsers,
+    //             thumbnailUrl: thumbnailPublicUrl,
+    //             duration: videoDuration, // ✅ Duration save
+    //         });
+
+    //         await this.videoRepository.save(video);
+
+    //         if (createVideoDto.type === VideoType.story) {
+    //             await this.storyDeleteQueue.add(
+    //                 { videoId: video.uuid },
+    //                 { delay: 24 * 60 * 60 * 1000 },
+    //             );
+
+    //             console.log(`Scheduled story deletion after 24h (ID: ${video.uuid})`);
+    //         }
+
+    //         const hashtagsToClean = (video.hashtags || []).map(h => h.id || h.tag);
+
+    //         if (hashtagsToClean.length) {
+    //             const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    //             await this.hashtagCleanupQueue.add(
+    //                 'removeVideoFromHashtags',
+    //                 {
+    //                     videoId: video.uuid,
+    //                     hashtagIdentifiers: hashtagsToClean,
+    //                 },
+    //                 {
+    //                     delay: sevenDaysMs,
+    //                     attempts: 3,
+    //                     backoff: { type: 'exponential', delay: 60 * 1000 },
+    //                     removeOnComplete: true,
+    //                     removeOnFail: false,
+    //                 },
+    //             );
+    //         }
+
+    //         for (const mentionedUser of mentionedUsers) {
+    //             this.gateway.emitToUser(
+    //                 mentionedUser.id,
+    //                 'mentioned_in_video',
+    //                 {
+    //                     whoMentioned: user.username,
+    //                     videoId: video.uuid
+    //                 }
+    //             );
+    //         }
+
+    //         for (const mention of mentionedUsers) {
+    //             try {
+    //                 this.tokenService.sendNotification(
+    //                     mention.id,
+    //                     'Hithoy',
+    //                     `${user.username} mentioned you in a post`,
+    //                 );
+    //                 this.notificationService.createNotification(
+    //                     mention,
+    //                     user,
+    //                     NotificationType.MENTION,
+    //                     `${user.username} mentioned you in a post`,
+    //                     video.uuid,
+    //                 );
+    //             } catch (err) {
+    //                 console.warn('Notification failed:', err.message);
+    //             }
+    //         }
+    //         return "stream uploaded successfully";
+
+    //     } catch (error) {
+    //         return "stream upload failed";
+    //     }
+    // }
     async create(createVideoDto: CreateVideoDto, filename: string, userId: string) {
-        console.log('createVideoDto:', createVideoDto);
+    try {
+        console.log(process.env.REDIS_USERNAME)
+        console.log(process.env.REDIS_HOST)
+        console.log(process.env.REDIS_PASSWORD)
+        console.log(process.env.REDIS_PORT)
+
         const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user) throw new BadRequestException('User not found. Invalid token.');
 
-        if (!user) {
-            throw new BadRequestException('User not found. Invalid token.');
-        }
-
-        // ✅ VIDEO DURATION - Sabse pehle calculate karo
-        const videoPath = path.join(process.cwd(), 'src', 'uploads', 'videos', filename);
-        let videoDuration = createVideoDto.duration || 15;
-
-        // Agar frontend se duration nahi aaya to ffprobe se nikalo
-        if (!createVideoDto.duration) {
+        // 1️⃣ Handle mentions immediately
+        let mentionedUsers: User[] = [];
+        let mentionsArray: string[] = [];
+        if (createVideoDto.mentions) {
             try {
-                videoDuration = await this.getVideoDuration(videoPath);
-                console.log(`Calculated video duration: ${videoDuration}s`);
-            } catch (err) {
-                console.warn('Could not get video duration, using default 15s:', err.message);
-                videoDuration = 15;
-            }
-        }
-
-        // ---------------- AUDIO HANDLING ----------------
-        let audio: Audio | null = null;
-        if (createVideoDto.music && uuidValidate(createVideoDto.music.id)) {
-            try {
-                audio = await this.audioRepository.findOneOrFail({
-                    where: { uuid: createVideoDto.music.id },
+                mentionsArray = Array.isArray(createVideoDto.mentions)
+                    ? createVideoDto.mentions
+                    : JSON.parse(createVideoDto.mentions);
+                mentionedUsers = await this.userRepository.findBy({
+                    username: In(mentionsArray),
                 });
             } catch (err) {
-                console.warn('AudioId invalid or not found. Attempting to extract from video...');
+                console.warn('Invalid mentions:', err.message);
             }
         }
 
-        if (!audio && createVideoDto.music) {
-            const audioFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.mp3`;
-            const audioPath = path.join(process.cwd(), 'src', 'uploads', 'audios', audioFilename);
-
-            const audioFolder = path.dirname(audioPath);
-            if (!fs.existsSync(audioFolder)) {
-                fs.mkdirSync(audioFolder, { recursive: true });
-            }
-
-            const hasAudio = await this.checkIfVideoHasAudio(videoPath);
-            if (hasAudio) {
-                await this.extractAudioFromVideo(videoPath, audioPath);
-
-                const uploadedAudio = await this.uploadService.uploadFile(audioPath, 'audios');
-                audio = this.audioRepository.create({
-                    uuid: uuidv4(),
-                    name: uploadedAudio.publicUrl,
-                    category: 'auto-extracted',
-                    author: userId,
-                });
-
-                await this.audioRepository.save(audio);
-                fs.unlinkSync(audioPath);
-            }
-        }
-
-        const overlayHashtags = createVideoDto.overlays
-            .filter(item => item.text.startsWith('#'))
-            .map(item => item.text);
-        const overlayMentions = createVideoDto.overlays
-            .filter(item => item.text.startsWith('@'))
-            .map(item => item.text);
-
-        const normalizedTags = ([...overlayHashtags, ...createVideoDto.hashtags || []])
-            .map((tag: string) => tag.trim().toLowerCase().replace(/^#/, ''));
+        // 2️⃣ Handle hashtags immediately
+        const overlayHashtags = (createVideoDto.overlays || [])
+            .filter(o => o.text.startsWith('#'))
+            .map(o => o.text);
+        const normalizedTags = [...overlayHashtags, ...(createVideoDto.hashtags || [])]
+            .map(t => t.trim().toLowerCase().replace(/^#/, ''));
 
         const existingTags = await this.hashtagRepo.find({
-            where: normalizedTags.map((tag) => ({ tag })),
+            where: normalizedTags.map(tag => ({ tag })),
         });
-        const existingTagNames = existingTags.map((t) => t.tag);
+        const existingTagNames = existingTags.map(t => t.tag);
         const newTags = normalizedTags
-            .filter((tag) => !existingTagNames.includes(tag))
-            .map((tag) => this.hashtagRepo.create({ tag }));
+            .filter(tag => !existingTagNames.includes(tag))
+            .map(tag => this.hashtagRepo.create({ tag }));
 
         const overallTags = [...new Set([...existingTags, ...newTags])];
 
-        // ---------------- MENTIONS HANDLING ----------------
-        let mentionedUsers: User[] = [];
-        let mentionsArray: string[] = [];
-        let tempMentionsArray: string[] = [];
-        if (createVideoDto.mentions || overlayMentions) {
-            try {
-                if (typeof createVideoDto.mentions === 'string') {
-                    tempMentionsArray = JSON.parse(createVideoDto.mentions);
-                } else if (Array.isArray(createVideoDto.mentions)) {
-                    tempMentionsArray = createVideoDto.mentions;
-                }
-                if (Array.isArray(tempMentionsArray)) {
-                    mentionsArray = tempMentionsArray;
-                }
-                if (overlayMentions && Array.isArray(overlayMentions)) {
-                    mentionsArray = [...mentionsArray, ...overlayMentions];
-                }
-            } catch (err) {
-                throw new BadRequestException('Mentions must be a valid JSON array of usernames.');
-            }
-        }
+        // 3️⃣ Create a pending video entry
+        const video = this.videoRepository.create({
+            title: createVideoDto.title,
+            caption: createVideoDto.caption,
+            type: createVideoDto.type || VideoType.reels,
+            user_id: user,
+            hashtags: overallTags,
+            mentions: mentionedUsers,
+            status: 'pending',
+            videoUrl: filename,
+        });
 
-        if (mentionsArray.length) {
-            mentionedUsers = await this.userRepository.findBy({
-                username: In(mentionsArray),
+        await this.videoRepository.save(video);
+
+        // 4️⃣ Add to background processing queue
+        try {
+         const job =   await this.videoQueue.add('PROCESS_VIDEO', {
+                videoId: video.uuid,
+                createVideoDto,
+                filename,
+                userId
             });
+    
+    console.log('✅ JOB ADDED', job.id);
+    
+        } catch (error) {
+            console.log(error);
+        }
+        // 5️⃣ Immediately respond to user
+        return {
+            success:true,
+            message: 'Video will be uploaded soon',
+            videoId: video.uuid
+        };
 
-            const foundUsernames = mentionedUsers.map((u) => u.username);
-            const missing = mentionsArray.filter((u) => !foundUsernames.includes(u));
+    } catch (error) {
+        console.error(error);
+        return { success: false, message: 'Stream upload failed' };
+    }
+}
 
-            if (missing.length) {
-                console.warn(`Ignored invalid mentions: ${missing.join(', ')}`);
-            }
+async processVideoJob(data: {
+        videoId: string;
+        createVideoDto: CreateVideoDto;
+        filename: string;
+        userId: string;
+    }) {
+        const { videoId, createVideoDto, filename, userId } = data;
+
+        const video = await this.videoRepository.findOne({
+            where: { uuid: videoId },
+            relations: ['user_id', 'mentions', 'hashtags'],
+        });
+        if (!video) throw new Error('Video not found');
+
+        const videoPath = path.join(process.cwd(), 'src/uploads/videos', filename);
+
+        // 1️⃣ duration
+        let duration = createVideoDto.duration || 15;
+        try {
+            duration = await this.getVideoDuration(videoPath);
+        } catch {}
+
+        // 2️⃣ audio (same logic)
+        let audio: Audio | null = null;
+        if (createVideoDto.music?.id && uuidValidate(createVideoDto.music.id)) {
+            audio = await this.audioRepository.findOne({
+                where: { uuid: createVideoDto.music.id },
+            });
         }
 
-        let externalAudioSrc = '';
-        if (createVideoDto.music && !uuidValidate(createVideoDto.music.id)) {
-            externalAudioSrc = createVideoDto.music.uri || '';
-        }
-
-        // const compressed = await this.compressVideoOverwrite(videoPath);
-        // const compressedPath = path.join(
-        //     path.dirname(videoPath),
-        //     `compressed_${path.basename(videoPath)}`
-        // );
-
-        // let uploadPath;
-        // // --- PROCESS VIDEO BEFORE SAVING ---
-        // const processedFilename = `${filename}`;
-        // const processedPath = path.join(process.cwd(), 'src', 'uploads', 'processedVideos', processedFilename);
-
-        // if (createVideoDto.type === VideoType.story) {
-        //     await this.processVideo({
-        //         inputPath: compressedPath,
-        //         outputPath: processedPath,
-        //         trimStart: Number(createVideoDto.trimStart) || 0,
-        //         trimEnd: Number(createVideoDto.trimEnd) || 0,
-        //         filterColor: createVideoDto.filter || 'transparent',
-        //         overlays: createVideoDto.overlays || [],
-        //     });
-        //     uploadPath = await this.uploadService.uploadFile(processedPath, 'stories');
-        //     fs.unlinkSync(processedPath);
-        // } else {
-        //     uploadPath = await this.uploadService.uploadFile(compressedPath, createVideoDto.type == VideoType.reels ? 'reels' : 'news');
-        // }
-        const compressed = await this.compressVideoOverwrite(videoPath);
+        // 3️⃣ compress
+        await this.compressVideoOverwrite(videoPath);
         const compressedPath = path.join(
             path.dirname(videoPath),
-            `compressed_${path.basename(videoPath)}`
+            `compressed_${filename}`,
         );
 
-        let uploadPath;
-        // --- PROCESS VIDEO BEFORE SAVING ---
-        const processedFilename = `${filename}`;
-        const processedPath = path.join(process.cwd(), 'src', 'uploads', 'processedVideos', processedFilename);
+        // 4️⃣ process
+        const processedPath = path.join(
+            process.cwd(),
+            'src/uploads/processedVideos',
+            filename,
+        );
 
-        // ✅ Process video for ALL types (reels, stories, news)
         await this.processVideo({
             inputPath: compressedPath,
             outputPath: processedPath,
             trimStart: Number(createVideoDto.trimStart) || 0,
             trimEnd: Number(createVideoDto.trimEnd) || 0,
-            filterColor: createVideoDto.filter || 'transparent',
             overlays: createVideoDto.overlays || [],
+            filterColor: createVideoDto.filter || 'transparent',
         });
 
-        // Determine upload folder based on type
-        let uploadFolder: string;
-        if (createVideoDto.type === VideoType.story) {
-            uploadFolder = 'stories';
-        } else if (createVideoDto.type === VideoType.reels) {
-            uploadFolder = 'reels';
-        } else {
-            uploadFolder = 'news';
-        }
+        // 5️⃣ upload
+        const folder =
+            createVideoDto.type === VideoType.story
+                ? 'stories'
+                : createVideoDto.type === VideoType.reels
+                ? 'reels'
+                : 'news';
 
-        uploadPath = await this.uploadService.uploadFile(processedPath, uploadFolder);
-        fs.unlinkSync(processedPath);
+        const uploaded = await this.uploadService.uploadFile(processedPath, folder);
 
-        let thumbnailPublicUrl = '';
+        // 6️⃣ thumbnail
+        let thumbnailUrl = '';
         try {
-            const thumbnailPath = await this.generateThumbnail(compressedPath);
-            const uploadedThumb = await this.uploadService.uploadFile(thumbnailPath, 'thumbnails');
-            thumbnailPublicUrl = uploadedThumb.publicUrl;
-            fs.unlinkSync(thumbnailPath);
-        } catch (err) {
-            console.warn('Thumbnail generation failed:', err.message);
-        }
+            const thumbPath = await this.generateThumbnail(compressedPath);
+            const uploadedThumb = await this.uploadService.uploadFile(
+                thumbPath,
+                'thumbnails',
+            );
+            thumbnailUrl = uploadedThumb.publicUrl;
+            fs.unlinkSync(thumbPath);
+        } catch {}
 
-        fs.unlinkSync(videoPath);
-        fs.unlinkSync(compressedPath);
-        filename = processedFilename;
-
-        // ---------------- CREATE VIDEO ----------------
-        const video = this.videoRepository.create({
-            title: createVideoDto.title,
-            caption: createVideoDto.caption,
-            type: createVideoDto.type || VideoType.reels,
-            externalAudioSrc: externalAudioSrc,
-            hashtags: overallTags,
-            user_id: user,
-            audio: audio || null,
-            videoUrl: uploadPath.publicUrl,
-            mentions: mentionedUsers,
-            thumbnailUrl: thumbnailPublicUrl,
-            duration: videoDuration, // ✅ Duration save
-        });
+        // 7️⃣ DB update
+        video.videoUrl = uploaded.publicUrl;
+        video.thumbnailUrl = thumbnailUrl;
+        video.audio = audio;
+        video.duration = duration;
+        video.status = 'uploaded';
 
         await this.videoRepository.save(video);
 
-        if (createVideoDto.type === VideoType.story) {
-            await this.storyDeleteQueue.add(
-                { videoId: video.uuid },
-                { delay: 24 * 60 * 60 * 1000 },
-            );
-
-            console.log(`Scheduled story deletion after 24h (ID: ${video.uuid})`);
-        }
-
-        const hashtagsToClean = (video.hashtags || []).map(h => h.id || h.tag);
-
-        if (hashtagsToClean.length) {
-            const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-            await this.hashtagCleanupQueue.add(
-                'removeVideoFromHashtags',
-                {
-                    videoId: video.uuid,
-                    hashtagIdentifiers: hashtagsToClean,
-                },
-                {
-                    delay: sevenDaysMs,
-                    attempts: 3,
-                    backoff: { type: 'exponential', delay: 60 * 1000 },
-                    removeOnComplete: true,
-                    removeOnFail: false,
-                },
-            );
-        }
-
-        for (const mentionedUser of mentionedUsers) {
-            this.gateway.emitToUser(
-                mentionedUser.id,
-                'mentioned_in_video',
-                {
-                    whoMentioned: user.username,
-                    videoId: video.uuid
-                }
-            );
-        }
-
-        for (const mention of mentionedUsers) {
-            try {
-                this.tokenService.sendNotification(
-                    mention.id,
-                    'Hithoy',
-                    `${user.username} mentioned you in a post`,
-                );
-                this.notificationService.createNotification(
-                    mention,
-                    user,
-                    NotificationType.MENTION,
-                    `${user.username} mentioned you in a post`,
-                    video.uuid,
-                );
-            } catch (err) {
-                console.warn('Notification failed:', err.message);
-            }
-        }
-
-
-
-        return "stream uploaded successfully";
+        // 8️⃣ cleanup
+        [videoPath, compressedPath, processedPath].forEach(p => {
+            if (fs.existsSync(p)) fs.unlinkSync(p);
+        });
     }
-
 
     async findAll(): Promise<String[]> {
         const videos = await this.videoRepository.find({
