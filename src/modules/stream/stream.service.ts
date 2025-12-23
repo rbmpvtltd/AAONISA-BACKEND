@@ -1284,12 +1284,7 @@ async processVideoJob(data: {
             .leftJoinAndSelect('video.likes', 'likes')
             .leftJoinAndSelect('video.comments', 'comments')
             .leftJoinAndSelect('video.views', 'views')
-            .leftJoin(
-                'video.likes',
-                'myLike',
-                'myLike.user.id = :userId',
-                { userId }
-            )
+            // .leftJoinAndSelect('likes.user', 'likeUser')
 
             .where('video.type != :storyType', { storyType: 'story' });
 
@@ -1355,7 +1350,11 @@ async processVideoJob(data: {
             likesCount: v.likes?.length || 0,
             viewsCount: v.views?.length || 0,
             commentsCount: v.comments?.length || 0,
+
+            isLiked: v.likes?.some(like => like.user?.id === userId) || false
         }));
+
+        console.log("fffffeedd", formatted);
 
         return {
             data: formatted,
