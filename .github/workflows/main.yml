@@ -31,6 +31,7 @@ jobs:
             git pull origin main || { echo 'Git pull failed'; exit 1; }
             npm install || { echo 'npm install failed'; exit 1; }
             npm run build || { echo 'Build failed'; exit 1; }
-            pm2 restart backend || { echo 'PM2 restart failed'; exit 1; }
+            pm2 restart backend || { echo 'PM2 backend restart failed'; exit 1; }
+            pm2 restart backend-worker || { echo 'PM2 worker restart failed'; exit 1; }
             echo "Deployment finished successfully ✅"
             
