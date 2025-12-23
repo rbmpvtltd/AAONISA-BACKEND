@@ -8,7 +8,7 @@ import * as ffmpeg from 'fluent-ffmpeg';
 import * as path from 'path';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import { User } from '../users/entities/user.entity';
+import { User, UserRole } from '../users/entities/user.entity';
 import { Hashtag } from './entities/hashtag.entity';
 import { Request, Response } from 'express';
 import { AppGateway } from 'src/app.gateway';
@@ -866,90 +866,90 @@ export class VideoService {
     //     }
     // }
     async create(createVideoDto: CreateVideoDto, filename: string, userId: string) {
-    try {
-        console.log(process.env.REDIS_USERNAME)
-        console.log(process.env.REDIS_HOST)
-        console.log(process.env.REDIS_PASSWORD)
-        console.log(process.env.REDIS_PORT)
-
-        const user = await this.userRepository.findOne({ where: { id: userId } });
-        if (!user) throw new BadRequestException('User not found. Invalid token.');
-
-        // 1️⃣ Handle mentions immediately
-        let mentionedUsers: User[] = [];
-        let mentionsArray: string[] = [];
-        if (createVideoDto.mentions) {
-            try {
-                mentionsArray = Array.isArray(createVideoDto.mentions)
-                    ? createVideoDto.mentions
-                    : JSON.parse(createVideoDto.mentions);
-                mentionedUsers = await this.userRepository.findBy({
-                    username: In(mentionsArray),
-                });
-            } catch (err) {
-                console.warn('Invalid mentions:', err.message);
-            }
-        }
-
-        // 2️⃣ Handle hashtags immediately
-        const overlayHashtags = (createVideoDto.overlays || [])
-            .filter(o => o.text.startsWith('#'))
-            .map(o => o.text);
-        const normalizedTags = [...overlayHashtags, ...(createVideoDto.hashtags || [])]
-            .map(t => t.trim().toLowerCase().replace(/^#/, ''));
-
-        const existingTags = await this.hashtagRepo.find({
-            where: normalizedTags.map(tag => ({ tag })),
-        });
-        const existingTagNames = existingTags.map(t => t.tag);
-        const newTags = normalizedTags
-            .filter(tag => !existingTagNames.includes(tag))
-            .map(tag => this.hashtagRepo.create({ tag }));
-
-        const overallTags = [...new Set([...existingTags, ...newTags])];
-
-        // 3️⃣ Create a pending video entry
-        const video = this.videoRepository.create({
-            title: createVideoDto.title,
-            caption: createVideoDto.caption,
-            type: createVideoDto.type || VideoType.reels,
-            user_id: user,
-            hashtags: overallTags,
-            mentions: mentionedUsers,
-            status: 'pending',
-            videoUrl: filename,
-        });
-
-        await this.videoRepository.save(video);
-
-        // 4️⃣ Add to background processing queue
         try {
-         const job =   await this.videoQueue.add('PROCESS_VIDEO', {
-                videoId: video.uuid,
-                createVideoDto,
-                filename,
-                userId
+            console.log(process.env.REDIS_USERNAME)
+            console.log(process.env.REDIS_HOST)
+            console.log(process.env.REDIS_PASSWORD)
+            console.log(process.env.REDIS_PORT)
+
+            const user = await this.userRepository.findOne({ where: { id: userId } });
+            if (!user) throw new BadRequestException('User not found. Invalid token.');
+
+            // 1️⃣ Handle mentions immediately
+            let mentionedUsers: User[] = [];
+            let mentionsArray: string[] = [];
+            if (createVideoDto.mentions) {
+                try {
+                    mentionsArray = Array.isArray(createVideoDto.mentions)
+                        ? createVideoDto.mentions
+                        : JSON.parse(createVideoDto.mentions);
+                    mentionedUsers = await this.userRepository.findBy({
+                        username: In(mentionsArray),
+                    });
+                } catch (err) {
+                    console.warn('Invalid mentions:', err.message);
+                }
+            }
+
+            // 2️⃣ Handle hashtags immediately
+            const overlayHashtags = (createVideoDto.overlays || [])
+                .filter(o => o.text.startsWith('#'))
+                .map(o => o.text);
+            const normalizedTags = [...overlayHashtags, ...(createVideoDto.hashtags || [])]
+                .map(t => t.trim().toLowerCase().replace(/^#/, ''));
+
+            const existingTags = await this.hashtagRepo.find({
+                where: normalizedTags.map(tag => ({ tag })),
             });
-    
-    console.log('✅ JOB ADDED', job.id);
-    
+            const existingTagNames = existingTags.map(t => t.tag);
+            const newTags = normalizedTags
+                .filter(tag => !existingTagNames.includes(tag))
+                .map(tag => this.hashtagRepo.create({ tag }));
+
+            const overallTags = [...new Set([...existingTags, ...newTags])];
+
+            // 3️⃣ Create a pending video entry
+            const video = this.videoRepository.create({
+                title: createVideoDto.title,
+                caption: createVideoDto.caption,
+                type: createVideoDto.type || VideoType.reels,
+                user_id: user,
+                hashtags: overallTags,
+                mentions: mentionedUsers,
+                status: 'pending',
+                videoUrl: filename,
+            });
+
+            await this.videoRepository.save(video);
+
+            // 4️⃣ Add to background processing queue
+            try {
+                const job = await this.videoQueue.add('PROCESS_VIDEO', {
+                    videoId: video.uuid,
+                    createVideoDto,
+                    filename,
+                    userId
+                });
+
+                console.log('✅ JOB ADDED', job.id);
+
+            } catch (error) {
+                console.log(error);
+            }
+            // 5️⃣ Immediately respond to user
+            return {
+                success: true,
+                message: 'Video will be uploaded soon',
+                videoId: video.uuid
+            };
+
         } catch (error) {
-            console.log(error);
+            console.error(error);
+            return { success: false, message: 'Stream upload failed' };
         }
-        // 5️⃣ Immediately respond to user
-        return {
-            success:true,
-            message: 'Video will be uploaded soon',
-            videoId: video.uuid
-        };
-
-    } catch (error) {
-        console.error(error);
-        return { success: false, message: 'Stream upload failed' };
     }
-}
 
-async processVideoJob(data: {
+    async processVideoJob(data: {
         videoId: string;
         createVideoDto: CreateVideoDto;
         filename: string;
@@ -969,7 +969,7 @@ async processVideoJob(data: {
         let duration = createVideoDto.duration || 15;
         try {
             duration = await this.getVideoDuration(videoPath);
-        } catch {}
+        } catch { }
 
         // 2️⃣ audio (same logic)
         let audio: Audio | null = null;
@@ -1007,8 +1007,8 @@ async processVideoJob(data: {
             createVideoDto.type === VideoType.story
                 ? 'stories'
                 : createVideoDto.type === VideoType.reels
-                ? 'reels'
-                : 'news';
+                    ? 'reels'
+                    : 'news';
 
         const uploaded = await this.uploadService.uploadFile(processedPath, folder);
 
@@ -1022,7 +1022,7 @@ async processVideoJob(data: {
             );
             thumbnailUrl = uploadedThumb.publicUrl;
             fs.unlinkSync(thumbPath);
-        } catch {}
+        } catch { }
 
         // 7️⃣ DB update
         video.videoUrl = uploaded.publicUrl;
@@ -1266,6 +1266,50 @@ async processVideoJob(data: {
     //         totalPages: Math.ceil(total / limit),
     //     };
     // }
+
+    async getAdminVideosFeed() {
+        const videos = await this.videoRepository
+            .createQueryBuilder('video')
+            .leftJoinAndSelect('video.user_id', 'user')
+            .leftJoinAndSelect('user.userProfile', 'userProfile')
+            .leftJoinAndSelect('video.audio', 'audio')
+            .leftJoinAndSelect('video.hashtags', 'hashtags')
+            .leftJoinAndSelect('video.likes', 'likes')
+            .leftJoinAndSelect('video.comments', 'comments')
+            .leftJoinAndSelect('video.views', 'views')
+            .where('video.type != :storyType', { storyType: 'story' })
+            .andWhere('user.role = :role', { role: UserRole.ADMIN })
+            .orderBy('video.created_at', 'DESC')
+            .getMany();
+
+        const formatted = videos.map(v => ({
+            id: v.uuid,
+            title: v.title,
+            caption: v.caption,
+            videoUrl: v.videoUrl,
+            type: v.type,
+            created_at: v.created_at,
+            thumbnailUrl: v.thumbnailUrl,
+            duration: v.duration || 15,
+            user: {
+                id: v.user_id.id,
+                username: v.user_id.username,
+                profilePic: v.user_id.userProfile?.ProfilePicture || '',
+                role: v.user_id.role
+            },
+            audio: v.audio ? { id: v.audio.uuid, title: v.audio.name } : null,
+            hashtags: v.hashtags?.map(h => h.tag) || [],
+            likesCount: v.likes?.length || 0,
+            viewsCount: v.views?.length || 0,
+            commentsCount: v.comments?.length || 0,
+        }));
+
+        return {
+            data: formatted,
+            total: formatted.length,
+        };
+    }
+
     async getVideosFeed(
         userId: string,
         feedType: 'followings' | 'news' | 'explore',
@@ -1282,6 +1326,7 @@ async processVideoJob(data: {
             .leftJoinAndSelect('video.audio', 'audio')
             .leftJoinAndSelect('video.hashtags', 'hashtags')
             .leftJoinAndSelect('video.likes', 'likes')
+            .leftJoinAndSelect('likes.user', 'likeUser')
             .leftJoinAndSelect('video.comments', 'comments')
             .leftJoinAndSelect('video.views', 'views')
             // .leftJoinAndSelect('likes.user', 'likeUser')
@@ -1354,8 +1399,7 @@ async processVideoJob(data: {
             isLiked: v.likes?.some(like => like.user?.id === userId) || false
         }));
 
-        console.log("fffffeedd", formatted);
-
+      console.log(formatted)
         return {
             data: formatted,
             page,
