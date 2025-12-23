@@ -8,7 +8,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
 import { UserProfile } from './entities/user-profile.entity';
-import { User } from './entities/user.entity';
+import { User, UserRole } from './entities/user.entity';
 import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/create-user.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto'
 import { UpdateUserEmail, UpdateUserPhone } from './dto/update-user.dto'
@@ -600,6 +600,32 @@ export class UserService {
       pageSize: limit,
     };
   }
+
+
+async editUserRole(userId: string, newRole: UserRole) {
+  const user = await this.userRepository.findOne({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+
+  if (!Object.values(UserRole).includes(newRole)) {
+    throw new BadRequestException('Invalid role');
+  }
+
+  user.role = newRole;
+  await this.userRepository.save(user);
+
+  return {
+    id: user.id,
+    username: user.username,
+    role: user.role,
+  };
+}
+
+
   // ===========================================================
 
   async getCurrentUser(userId: string) {

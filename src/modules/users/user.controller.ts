@@ -5,6 +5,7 @@ import {
   Param,
   NotFoundException,
   Query,
+  Put,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, PreRegisterDto } from './dto/create-user.dto';
@@ -19,14 +20,14 @@ import { VerifyOtpDto } from '../otp/dto/verify-otp.dto';
 import { BlockUserDto } from './dto/block.dto';
 import { BlockService } from './block.service';
 import { VideoService } from '../stream/stream.service';
-import { User } from './entities/user.entity';
+import { User, UserRole } from './entities/user.entity';
 @Controller('users')
 export class UserController {
   constructor(
     private readonly userService: UserService,
     private readonly videosService: UserService,
-     private readonly blockService: BlockService
-    ) { }
+    private readonly blockService: BlockService
+  ) { }
 
   @Post('register-check')
   registerCheck(@Body() dto: PreRegisterDto) {
@@ -112,53 +113,61 @@ export class UserController {
   // }
 
   // admin panel to get all users
-@Get('all-users')
-getAllUsers(
-  @Query('page') page = 1,
-  @Query('limit') limit = 10,
-  @Query('search') search?: string,
-) {
-  return this.userService.allUsersDetails(
-    Number(page),
-    Number(limit),
-    search
-  );
-}
+  @Get('all-users')
+  getAllUsers(
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+    @Query('search') search?: string,
+  ) {
+    return this.userService.allUsersDetails(
+      Number(page),
+      Number(limit),
+      search
+    );
+  }
 
-// videos.controller.ts
-@Get('all-videos')
-async getAllVideos(
-  @Query('page') page: string = '1',
-  @Query('limit') limit: string = '12',
-  @Query('search') search?: string,
-  @Query('hashtag') hashtag?: string,
-  @Query('startDate') startDate?: string,
-  @Query('endDate') endDate?: string,
-  @Query('type') videoType?: string,
-) {
+  // videos.controller.ts
+  @Get('all-videos')
+  async getAllVideos(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '12',
+    @Query('search') search?: string,
+    @Query('hashtag') hashtag?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('type') videoType?: string,
+  ) {
 
     console.log('Received filters:', {
-    page,
-    limit,
-    search,
-    hashtag,
-    startDate,
-    endDate,
-    videoType
-  });
+      page,
+      limit,
+      search,
+      hashtag,
+      startDate,
+      endDate,
+      videoType
+    });
 
-  return this.videosService.getAllVideos(
-    parseInt(page),
-    parseInt(limit),
-    search,
-    hashtag,
-    startDate,
-    endDate,
-    videoType
-  );
-}
+    return this.videosService.getAllVideos(
+      parseInt(page),
+      parseInt(limit),
+      search,
+      hashtag,
+      startDate,
+      endDate,
+      videoType
+    );
+  }
 
-// ===========================================================
+  @Post('role/:id')
+  @UseGuards(JwtAuthGuard)
+  // @Roles(UserRole.ADMIN) // 👈 only admin can change role
+  async updateUserRole(@Param('id') userId: string, @Body('role') role: UserRole
+  ) {
+    return this.userService.editUserRole(userId, role);
+  }
+
+  // ===========================================================
 
   @UseGuards(JwtAuthGuard)
   @Get('profile/current')

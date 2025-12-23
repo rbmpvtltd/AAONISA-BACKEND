@@ -8,6 +8,8 @@ import { VideoService } from './stream.service'
 import { join } from 'path';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { Request, Response } from 'express';
+import { Roles } from 'src/common/utils/decorators';
+import { UserRole } from '../users/entities/user.entity';
 @Controller('videos')
 export class VideoController {
   constructor(private readonly videoService: VideoService) { }
@@ -99,28 +101,38 @@ export class VideoController {
 
   //   return this.videoService.getVideosFeed(user.userId, feedType, pageNum, limitNum);
   // }
-  @Get('feed')
-@UseGuards(JwtAuthGuard)
-async getFeed(
-  @Req() req: Request,
-  @Query('type') type: 'followings' | 'news' | 'explore',
-  @Query('page') page: string,
-  @Query('limit') limit: string,
-  @Query('random') random: string, // 👈 NEW
-) {
-  const user = req.user as { userId?: string };
-  if (!user?.userId) {
-    throw new BadRequestException('Invalid or missing user ID in token.');
+
+  @Get('getAdminVideosFeed')
+  @UseGuards(JwtAuthGuard)
+  async getAdminVideosFeed() {
+    return this.videoService.getAdminVideosFeed();
   }
 
-  return this.videoService.getVideosFeed(
-    user.userId,
-    type || 'news',
-    parseInt(page, 10) || 1,
-    parseInt(limit, 10) || 10,
-    random === 'true' // 👈 string → boolean
-  );
-}
+
+  @Get('feed')
+  @UseGuards(JwtAuthGuard)
+  async getFeed(
+    @Req() req: Request,
+    @Query('type') type: 'followings' | 'news' | 'explore',
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+    @Query('random') random: string, // 👈 NEW
+  ) {
+    const user = req.user as { userId?: string };
+    console.log("uuuuuuuuuuuuuuuuuuu", user);
+    
+    if (!user?.userId) {
+      throw new BadRequestException('Invalid or missing user ID in token.');
+    }
+
+    return this.videoService.getVideosFeed(
+      user.userId,
+      type || 'news',
+      parseInt(page, 10) || 1,
+      parseInt(limit, 10) || 10,
+      random === 'true' // 👈 string → boolean
+    );
+  }
 
   @Get('explore/:id')
   @UseGuards(JwtAuthGuard)

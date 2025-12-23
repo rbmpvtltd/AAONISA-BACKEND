@@ -8,7 +8,7 @@ import * as ffmpeg from 'fluent-ffmpeg';
 import * as path from 'path';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import { User } from '../users/entities/user.entity';
+import { User, UserRole } from '../users/entities/user.entity';
 import { Hashtag } from './entities/hashtag.entity';
 import { Request, Response } from 'express';
 import { AppGateway } from 'src/app.gateway';
@@ -1456,6 +1456,50 @@ export class VideoService {
     //         totalPages: Math.ceil(total / limit),
     //     };
     // }
+
+    async getAdminVideosFeed() {
+        const videos = await this.videoRepository
+            .createQueryBuilder('video')
+            .leftJoinAndSelect('video.user_id', 'user')
+            .leftJoinAndSelect('user.userProfile', 'userProfile')
+            .leftJoinAndSelect('video.audio', 'audio')
+            .leftJoinAndSelect('video.hashtags', 'hashtags')
+            .leftJoinAndSelect('video.likes', 'likes')
+            .leftJoinAndSelect('video.comments', 'comments')
+            .leftJoinAndSelect('video.views', 'views')
+            .where('video.type != :storyType', { storyType: 'story' })
+            .andWhere('user.role = :role', { role: UserRole.ADMIN })
+            .orderBy('video.created_at', 'DESC')
+            .getMany();
+
+        const formatted = videos.map(v => ({
+            id: v.uuid,
+            title: v.title,
+            caption: v.caption,
+            videoUrl: v.videoUrl,
+            type: v.type,
+            created_at: v.created_at,
+            thumbnailUrl: v.thumbnailUrl,
+            duration: v.duration || 15,
+            user: {
+                id: v.user_id.id,
+                username: v.user_id.username,
+                profilePic: v.user_id.userProfile?.ProfilePicture || '',
+                role: v.user_id.role
+            },
+            audio: v.audio ? { id: v.audio.uuid, title: v.audio.name } : null,
+            hashtags: v.hashtags?.map(h => h.tag) || [],
+            likesCount: v.likes?.length || 0,
+            viewsCount: v.views?.length || 0,
+            commentsCount: v.comments?.length || 0,
+        }));
+
+        return {
+            data: formatted,
+            total: formatted.length,
+        };
+    }
+
     async getVideosFeed(
         userId: string,
         feedType: 'followings' | 'news' | 'explore',
@@ -1472,6 +1516,7 @@ export class VideoService {
             .leftJoinAndSelect('video.audio', 'audio')
             .leftJoinAndSelect('video.hashtags', 'hashtags')
             .leftJoinAndSelect('video.likes', 'likes')
+            .leftJoinAndSelect('likes.user', 'likeUser')
             .leftJoinAndSelect('video.comments', 'comments')
             .leftJoinAndSelect('video.views', 'views')
             // .leftJoinAndSelect('likes.user', 'likeUser')
@@ -1544,8 +1589,7 @@ export class VideoService {
             isLiked: v.likes?.some(like => like.user?.id === userId) || false
         }));
 
-        console.log("fffffeedd", formatted);
-
+      console.log(formatted)
         return {
             data: formatted,
             page,
