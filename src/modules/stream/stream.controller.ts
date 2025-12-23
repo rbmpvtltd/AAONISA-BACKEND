@@ -32,6 +32,7 @@ export class VideoController {
     @Body() body: any,
     @Req() req: Request,
   ) {
+    console.log('video body', body)
     const user = req.user as { userId?: string }
     if (!user || !user.userId) {
       throw new BadRequestException('Invalid or missing user ID in token.');
