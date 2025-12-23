@@ -866,178 +866,368 @@ export class VideoService {
     //     }
     // }
     async create(createVideoDto: CreateVideoDto, filename: string, userId: string) {
-    try {
-        console.log(process.env.REDIS_USERNAME)
-        console.log(process.env.REDIS_HOST)
-        console.log(process.env.REDIS_PASSWORD)
-        console.log(process.env.REDIS_PORT)
-
-        const user = await this.userRepository.findOne({ where: { id: userId } });
-        if (!user) throw new BadRequestException('User not found. Invalid token.');
-
-        // 1️⃣ Handle mentions immediately
-        let mentionedUsers: User[] = [];
-        let mentionsArray: string[] = [];
-        if (createVideoDto.mentions) {
-            try {
-                mentionsArray = Array.isArray(createVideoDto.mentions)
-                    ? createVideoDto.mentions
-                    : JSON.parse(createVideoDto.mentions);
-                mentionedUsers = await this.userRepository.findBy({
-                    username: In(mentionsArray),
-                });
-            } catch (err) {
-                console.warn('Invalid mentions:', err.message);
-            }
-        }
-
-        // 2️⃣ Handle hashtags immediately
-        const overlayHashtags = (createVideoDto.overlays || [])
-            .filter(o => o.text.startsWith('#'))
-            .map(o => o.text);
-        const normalizedTags = [...overlayHashtags, ...(createVideoDto.hashtags || [])]
-            .map(t => t.trim().toLowerCase().replace(/^#/, ''));
-
-        const existingTags = await this.hashtagRepo.find({
-            where: normalizedTags.map(tag => ({ tag })),
-        });
-        const existingTagNames = existingTags.map(t => t.tag);
-        const newTags = normalizedTags
-            .filter(tag => !existingTagNames.includes(tag))
-            .map(tag => this.hashtagRepo.create({ tag }));
-
-        const overallTags = [...new Set([...existingTags, ...newTags])];
-
-        // 3️⃣ Create a pending video entry
-        const video = this.videoRepository.create({
-            title: createVideoDto.title,
-            caption: createVideoDto.caption,
-            type: createVideoDto.type || VideoType.reels,
-            user_id: user,
-            hashtags: overallTags,
-            mentions: mentionedUsers,
-            status: 'pending',
-            videoUrl: filename,
-        });
-
-        await this.videoRepository.save(video);
-
-        // 4️⃣ Add to background processing queue
         try {
-         const job =   await this.videoQueue.add('PROCESS_VIDEO', {
-                videoId: video.uuid,
-                createVideoDto,
-                filename,
-                userId
+            const user = await this.userRepository.findOne({ where: { id: userId } });
+            if (!user) throw new BadRequestException('User not found. Invalid token.');
+
+            // 1️⃣ Handle mentions immediately
+            const overlayMentions = createVideoDto.overlays
+                .filter(item => item.text.startsWith('@'))
+                .map(item => item.text);
+            let mentionedUsers: User[] = [];
+            let mentionsArray: string[] = [];
+            let tempMentionsArray: string[] = [];
+            let normalizedMentions: string[] = [];
+            if (createVideoDto.mentions || overlayMentions) {
+                try {
+                    if (typeof createVideoDto.mentions === 'string') {
+                        tempMentionsArray = JSON.parse(createVideoDto.mentions);
+                    } else if (Array.isArray(createVideoDto.mentions)) {
+                        tempMentionsArray = createVideoDto.mentions;
+                    }
+                    if (Array.isArray(tempMentionsArray)) {
+                        mentionsArray = tempMentionsArray;
+                    }
+                    if (overlayMentions && Array.isArray(overlayMentions)) {
+                        mentionsArray = [...mentionsArray, ...overlayMentions];
+                    }
+                    normalizedMentions = mentionsArray.map(t => t.trim().toLowerCase().replace(/^@/, ''));
+                } catch (err) {
+                    throw new BadRequestException('Mentions must be a valid JSON array of usernames.');
+                }
+            }
+
+            if (normalizedMentions.length) {
+                mentionedUsers = await this.userRepository.findBy({
+                    username: In(normalizedMentions),
+                });
+
+                const foundUsernames = mentionedUsers.map((u) => u.username);
+                const missing = normalizedMentions.filter((u) => !foundUsernames.includes(u));
+
+                if (missing.length) {
+                    console.warn(`Ignored invalid mentions: ${missing.join(', ')}`);
+                }
+            }
+
+            // 2️⃣ Handle hashtags immediately
+            const overlayHashtags = (createVideoDto.overlays || [])
+                .filter(o => o.text.startsWith('#'))
+                .map(o => o.text);
+            const normalizedTags = [...overlayHashtags, ...(createVideoDto.hashtags || [])]
+                .map(t => t.trim().toLowerCase().replace(/^#/, ''));
+
+            const existingTags = await this.hashtagRepo.find({
+                where: normalizedTags.map(tag => ({ tag })),
             });
-    
-    console.log('✅ JOB ADDED', job.id);
-    
+            const existingTagNames = existingTags.map(t => t.tag);
+            const newTags = normalizedTags
+                .filter(tag => !existingTagNames.includes(tag))
+                .map(tag => this.hashtagRepo.create({ tag }));
+
+            const overallTags = [...new Set([...existingTags, ...newTags])];
+
+            // 3️⃣ Create a pending video entry
+            const video = this.videoRepository.create({
+                title: createVideoDto.title,
+                caption: createVideoDto.caption,
+                type: createVideoDto.type || VideoType.reels,
+                user_id: user,
+                hashtags: overallTags,
+                mentions: mentionedUsers,
+                status: 'pending',
+                videoUrl: filename,
+            });
+
+            await this.videoRepository.save(video);
+            if (createVideoDto.type === VideoType.story) {
+                await this.storyDeleteQueue.add(
+                    { videoId: video.uuid },
+                    { delay: 24 * 60 * 60 * 1000 },
+                );
+
+                console.log(`Scheduled story deletion after 24h (ID: ${video.uuid})`);
+            }
+
+            const hashtagsToClean = (video.hashtags || []).map(h => h.id || h.tag);
+
+            if (hashtagsToClean.length) {
+                const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+                await this.hashtagCleanupQueue.add(
+                    'removeVideoFromHashtags',
+                    {
+                        videoId: video.uuid,
+                        hashtagIdentifiers: hashtagsToClean,
+                    },
+                    {
+                        delay: sevenDaysMs,
+                        attempts: 3,
+                        backoff: { type: 'exponential', delay: 60 * 1000 },
+                        removeOnComplete: true,
+                        removeOnFail: false,
+                    },
+                );
+            }
+
+            for (const mention of mentionedUsers) {
+                try {
+                    this.tokenService.sendNotification(
+                        mention.id,
+                        'Hithoy',
+                        `${user.username} mentioned you in a post`,
+                    );
+                    this.notificationService.createNotification(
+                        mention,
+                        user,
+                        NotificationType.MENTION,
+                        `${user.username} mentioned you in a post`,
+                        video.uuid,
+                    );
+                } catch (err) {
+                    console.warn('Notification failed:', err.message);
+                }
+            }
+            try {
+                await this.videoQueue.add('PROCESS_VIDEO', {
+                    videoId: video.uuid,
+                    createVideoDto,
+                    filename,
+                    userId
+                });
+
+            } catch (error) {
+                console.log(error);
+            }
+            return {
+                success: true,
+                message: 'Video will be uploaded soon',
+                videoId: video.uuid
+            };
+
         } catch (error) {
-            console.log(error);
+            console.error(error);
+            return { success: false, message: 'Stream upload failed' };
         }
-        // 5️⃣ Immediately respond to user
-        return {
-            success:true,
-            message: 'Video will be uploaded soon',
-            videoId: video.uuid
-        };
-
-    } catch (error) {
-        console.error(error);
-        return { success: false, message: 'Stream upload failed' };
     }
-}
 
-async processVideoJob(data: {
+    async processVideoJob(data: {
         videoId: string;
         createVideoDto: CreateVideoDto;
         filename: string;
         userId: string;
     }) {
-        const { videoId, createVideoDto, filename, userId } = data;
+        const startTime = Date.now();
+        console.log('🚀 PROCESS VIDEO JOB STARTED', data.videoId);
 
-        const video = await this.videoRepository.findOne({
-            where: { uuid: videoId },
-            relations: ['user_id', 'mentions', 'hashtags'],
-        });
-        if (!video) throw new Error('Video not found');
-
-        const videoPath = path.join(process.cwd(), 'src/uploads/videos', filename);
-
-        // 1️⃣ duration
-        let duration = createVideoDto.duration || 15;
         try {
-            duration = await this.getVideoDuration(videoPath);
-        } catch {}
+            const { videoId, createVideoDto, filename } = data;
 
-        // 2️⃣ audio (same logic)
-        let audio: Audio | null = null;
-        if (createVideoDto.music?.id && uuidValidate(createVideoDto.music.id)) {
-            audio = await this.audioRepository.findOne({
-                where: { uuid: createVideoDto.music.id },
+            /* =======================
+               1️⃣ FETCH VIDEO
+            ======================= */
+            console.log('🔍 Fetching video from DB...');
+            const video = await this.videoRepository.findOne({
+                where: { uuid: videoId },
+                relations: ['user_id', 'mentions', 'hashtags'],
             });
-        }
 
-        // 3️⃣ compress
-        await this.compressVideoOverwrite(videoPath);
-        const compressedPath = path.join(
-            path.dirname(videoPath),
-            `compressed_${filename}`,
-        );
+            if (!video) {
+                console.error('❌ Video not found:', videoId);
+                throw new Error('Video not found');
+            }
 
-        // 4️⃣ process
-        const processedPath = path.join(
-            process.cwd(),
-            'src/uploads/processedVideos',
-            filename,
-        );
-
-        await this.processVideo({
-            inputPath: compressedPath,
-            outputPath: processedPath,
-            trimStart: Number(createVideoDto.trimStart) || 0,
-            trimEnd: Number(createVideoDto.trimEnd) || 0,
-            overlays: createVideoDto.overlays || [],
-            filterColor: createVideoDto.filter || 'transparent',
-        });
-
-        // 5️⃣ upload
-        const folder =
-            createVideoDto.type === VideoType.story
-                ? 'stories'
-                : createVideoDto.type === VideoType.reels
-                ? 'reels'
-                : 'news';
-
-        const uploaded = await this.uploadService.uploadFile(processedPath, folder);
-
-        // 6️⃣ thumbnail
-        let thumbnailUrl = '';
-        try {
-            const thumbPath = await this.generateThumbnail(compressedPath);
-            const uploadedThumb = await this.uploadService.uploadFile(
-                thumbPath,
-                'thumbnails',
+            const videoPath = path.join(
+                process.cwd(),
+                'src/uploads/videos',
+                filename,
             );
-            thumbnailUrl = uploadedThumb.publicUrl;
-            fs.unlinkSync(thumbPath);
-        } catch {}
 
-        // 7️⃣ DB update
-        video.videoUrl = uploaded.publicUrl;
-        video.thumbnailUrl = thumbnailUrl;
-        video.audio = audio;
-        video.duration = duration;
-        video.status = 'uploaded';
+            if (!fs.existsSync(videoPath)) {
+                console.error('❌ Video file missing:', videoPath);
+                throw new Error('Source video file missing');
+            }
 
-        await this.videoRepository.save(video);
+            /* =======================
+               2️⃣ DURATION
+            ======================= */
+            let duration = createVideoDto.duration || 15;
+            try {
+                duration = await this.getVideoDuration(videoPath);
+                console.log('⏱ Video duration:', duration);
+            } catch (e) {
+                console.warn('⚠️ Failed to get duration, using default:', e.message);
+            }
 
-        // 8️⃣ cleanup
-        [videoPath, compressedPath, processedPath].forEach(p => {
-            if (fs.existsSync(p)) fs.unlinkSync(p);
-        });
+            /* =======================
+   3️⃣ AUDIO (FULL FLOW)
+======================= */
+            let audio: Audio | null = null;
+            let externalAudioSrc = '';
+
+            if (createVideoDto.music) {
+
+                // 🟢 CASE 1: Existing audio (UUID)
+                if (createVideoDto.music.id && uuidValidate(createVideoDto.music.id)) {
+                    console.log('🎵 Using existing audio');
+                    audio = await this.audioRepository.findOne({
+                        where: { uuid: createVideoDto.music.id },
+                    });
+                }
+
+                // 🟡 CASE 2: Extract audio from video
+                else if (createVideoDto.music.id) {
+                    console.log('🎧 Extracting audio from video');
+
+                    const audioFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.mp3`;
+                    const audioPath = path.join(
+                        process.cwd(),
+                        'src/uploads/audios',
+                        audioFilename,
+                    );
+
+                    const audioFolder = path.dirname(audioPath);
+                    if (!fs.existsSync(audioFolder)) {
+                        fs.mkdirSync(audioFolder, { recursive: true });
+                    }
+
+                    const hasAudio = await this.checkIfVideoHasAudio(videoPath);
+
+                    if (hasAudio) {
+                        await this.extractAudioFromVideo(videoPath, audioPath);
+
+                        const uploadedAudio = await this.uploadService.uploadFile(
+                            audioPath,
+                            'audios',
+                        );
+
+                        audio = this.audioRepository.create({
+                            uuid: uuidv4(),
+                            name: uploadedAudio.publicUrl, // 🔥 AUDIO URL
+                            category: 'auto-extracted',
+                            author: data.userId,
+                        });
+
+                        await this.audioRepository.save(audio);
+                        fs.unlinkSync(audioPath);
+                    }
+                }
+
+                // 🔵 CASE 3: External audio URL
+                if (!audio && createVideoDto.music.uri) {
+                    console.log('🌍 External audio detected');
+                    externalAudioSrc = createVideoDto.music.uri;
+                }
+            }
+
+
+            /* =======================
+               4️⃣ COMPRESS
+            ======================= */
+            console.log('📦 Compressing video...');
+            await this.compressVideoOverwrite(videoPath);
+
+            const compressedPath = path.join(
+                path.dirname(videoPath),
+                `compressed_${filename}`,
+            );
+
+            if (!fs.existsSync(compressedPath)) {
+                throw new Error('Compressed video not found');
+            }
+
+            /* =======================
+               5️⃣ PROCESS VIDEO
+            ======================= */
+            console.log('🎨 Processing video (filters, trims, overlays)...');
+
+            const processedPath = path.join(
+                process.cwd(),
+                'src/uploads/processedVideos',
+                filename,
+            );
+
+            await this.processVideo({
+                inputPath: compressedPath,
+                outputPath: processedPath,
+                trimStart: Number(createVideoDto.trimStart) || 0,
+                trimEnd: Number(createVideoDto.trimEnd) || 0,
+                overlays: createVideoDto.overlays || [],
+                filterColor: createVideoDto.filter || 'transparent',
+            });
+
+            if (!fs.existsSync(processedPath)) {
+                throw new Error('Processed video not generated');
+            }
+
+            /* =======================
+               6️⃣ UPLOAD VIDEO
+            ======================= */
+            const folder =
+                createVideoDto.type === VideoType.story
+                    ? 'stories'
+                    : createVideoDto.type === VideoType.reels
+                        ? 'reels'
+                        : 'news';
+
+            console.log('☁️ Uploading video to:', folder);
+            const uploaded = await this.uploadService.uploadFile(processedPath, folder);
+
+            /* =======================
+               7️⃣ THUMBNAIL
+            ======================= */
+            let thumbnailUrl = '';
+            try {
+                console.log('🖼 Generating thumbnail...');
+                const thumbPath = await this.generateThumbnail(compressedPath);
+                const uploadedThumb = await this.uploadService.uploadFile(
+                    thumbPath,
+                    'thumbnails',
+                );
+                thumbnailUrl = uploadedThumb.publicUrl;
+                fs.unlinkSync(thumbPath);
+            } catch (e) {
+                console.warn('⚠️ Thumbnail generation failed:', e.message);
+            }
+
+            /* =======================
+               8️⃣ DB UPDATE
+            ======================= */
+            console.log('💾 Updating DB...');
+            video.videoUrl = uploaded.publicUrl;
+            video.thumbnailUrl = thumbnailUrl;
+            video.audio = audio;
+            video.externalAudioSrc = externalAudioSrc;
+            video.duration = duration;
+            video.status = 'uploaded';
+
+            await this.videoRepository.save(video);
+
+            /* =======================
+               9️⃣ CLEANUP
+            ======================= */
+            console.log('🧹 Cleaning temp files...');
+            [videoPath, compressedPath, processedPath].forEach(p => {
+                if (fs.existsSync(p)) fs.unlinkSync(p);
+            });
+
+            console.log(
+                `✅ VIDEO JOB COMPLETED in ${(Date.now() - startTime) / 1000}s`,
+            );
+        } catch (error) {
+            console.error('🔥 VIDEO JOB FAILED:', error.message, error.stack);
+
+            // Optional: mark video as failed
+            try {
+                await this.videoRepository.update(
+                    { uuid: data.videoId },
+                    { status: 'failed' },
+                );
+            } catch { }
+
+            throw error; // IMPORTANT: Bull ko pata chale job failed
+        }
     }
+
 
     async findAll(): Promise<String[]> {
         const videos = await this.videoRepository.find({
