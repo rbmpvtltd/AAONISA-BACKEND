@@ -676,8 +676,23 @@ export class UserService {
       .orderBy('video.created_at', 'DESC')
       .getMany();
 
-    console.log('🎥 Videos found:', videos.length);
+    const mentionedVideos = await this.videoRepository
+      .createQueryBuilder('video')
+      .leftJoinAndSelect('video.user_id', 'owner') // video owner
+      .leftJoinAndSelect('owner.userProfile', 'ownerProfile')
+      .leftJoinAndSelect('video.audio', 'audio')
+      .leftJoinAndSelect('video.hashtags', 'hashtags')
+      .leftJoinAndSelect('video.likes', 'likes')
+      .leftJoinAndSelect('video.views', 'views')
+      .leftJoinAndSelect('video.comments', 'comments')
+      .leftJoin('video.mentions', 'mention')
+      .where('mention.id = :userId', { userId })
+      .andWhere('video.type != :type', { type: 'story' })
+      .orderBy('video.created_at', 'DESC')
+      .getMany();
 
+    console.log('🎥 Videos found:', videos.length);
+    console.log('🎥 Mentioned videos found:', mentionedVideos.length);
     console.log('📊 Followers count:', followers.length);
     console.log('📊 Followings count:', followings.length);
 
@@ -691,7 +706,8 @@ export class UserService {
       userProfile: user.userProfile,
       followers,
       followings,
-      videos
+      videos,
+      mentionedVideos
     };
   }
 
