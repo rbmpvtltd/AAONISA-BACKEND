@@ -714,6 +714,7 @@ export class UserService {
       .leftJoinAndSelect('video.likes', 'likes')
       .leftJoinAndSelect('video.views', 'views')
       .leftJoinAndSelect('video.comments', 'comments')
+      .leftJoinAndSelect('likes.user', 'likeUser')
       .where('video.user_id = :userId', { userId })
       .andWhere('video.type != :type', { type: 'story' })
       .orderBy('video.created_at', 'DESC')
@@ -727,6 +728,7 @@ export class UserService {
       .leftJoinAndSelect('video.hashtags', 'hashtags')
       .leftJoinAndSelect('video.likes', 'likes')
       .leftJoinAndSelect('video.views', 'views')
+      .leftJoinAndSelect('likes.user', 'likeUser')
       .leftJoinAndSelect('video.comments', 'comments')
       .leftJoin('video.mentions', 'mention')
       .where('mention.id = :userId', { userId })
@@ -739,6 +741,14 @@ export class UserService {
     console.log('📊 Followers count:', followers.length);
     console.log('📊 Followings count:', followings.length);
 
+    const formattedVideos = videos.map(video => ({
+      ...video,
+      isLiked: video.likes?.some(like => like.user?.id === userId) || false,
+      likesCount: video.likes?.length || 0,
+      commentsCount: video.comments?.length || 0,
+      viewsCount: video.views?.length || 0,
+    }));
+
     // Step 4: Final response
     return {
       id: user.id,
@@ -749,7 +759,7 @@ export class UserService {
       userProfile: user.userProfile,
       followersWithFlag,
       followingsWithFlag,
-      videos,
+      videos: formattedVideos,
       mentionedVideos
     };
   }
