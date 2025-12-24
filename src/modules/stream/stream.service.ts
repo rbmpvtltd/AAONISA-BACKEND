@@ -20,6 +20,7 @@ import { Follow } from '../follows/entities/follow.entity';
 import { TokenService } from '../tokens/token.service';
 import { NotificationService } from '../notifications/notification.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
+import { is } from 'drizzle-orm';
 const { createCanvas } = require('canvas');
 
 interface OverlayMetadata {
@@ -1457,8 +1458,61 @@ export class VideoService {
     //     };
     // }
 
-    async getAdminVideosFeed() {
-        const videos = await this.videoRepository
+    //     async getAdminVideosFeed(page = 1, limit = 10) {
+    //         const skip = (page - 1) * limit;
+
+    //         const videos = await this.videoRepository
+    //             .createQueryBuilder('video')
+    //             .leftJoinAndSelect('video.user_id', 'user')
+    //             .leftJoinAndSelect('user.userProfile', 'userProfile')
+    //             .leftJoinAndSelect('video.audio', 'audio')
+    //             .leftJoinAndSelect('video.hashtags', 'hashtags')
+    //             .leftJoinAndSelect('video.likes', 'likes')
+    //             .leftJoinAndSelect('video.comments', 'comments')
+    //             .leftJoinAndSelect('video.views', 'views')
+    //             .where('video.type != :storyType', { storyType: 'story' })
+    //             .andWhere('user.role = :role', { role: UserRole.ADMIN })
+    //             .orderBy('video.created_at', 'DESC')
+    //             .getMany();
+    //                .skip(skip)
+    //             .take(limit)
+    //             .getManyAndCount();
+
+    //         const formatted = videos.map(v => ({
+    //             id: v.uuid,
+    //             title: v.title,
+    //             caption: v.caption,
+    //             videoUrl: v.videoUrl,
+    //             type: v.type,
+    //             created_at: v.created_at,
+    //             thumbnailUrl: v.thumbnailUrl,
+    //             duration: v.duration || 15,
+    //             user: {
+    //                 id: v.user_id.id,
+    //                 username: v.user_id.username,
+    //                 profilePic: v.user_id.userProfile?.ProfilePicture || '',
+    //                 role: v.user_id.role
+    //             },
+    //             audio: v.audio ? { id: v.audio.uuid, title: v.audio.name } : null,
+    //             hashtags: v.hashtags?.map(h => h.tag) || [],
+    //             likesCount: v.likes?.length || 0,
+    //             viewsCount: v.views?.length || 0,
+    //             commentsCount: v.comments?.length || 0,
+    //         }));
+
+    //          return {
+    //     data: formatted,
+    //     page,
+    //     limit,
+    //     total,
+    //     hasNextPage: skip + limit < total,
+    //   };
+    //     }
+
+    async getAdminVideosFeed(page = 1, limit = 10) {
+        const skip = (page - 1) * limit;
+
+        const [videos, total] = await this.videoRepository
             .createQueryBuilder('video')
             .leftJoinAndSelect('video.user_id', 'user')
             .leftJoinAndSelect('user.userProfile', 'userProfile')
@@ -1467,10 +1521,13 @@ export class VideoService {
             .leftJoinAndSelect('video.likes', 'likes')
             .leftJoinAndSelect('video.comments', 'comments')
             .leftJoinAndSelect('video.views', 'views')
+            .leftJoinAndSelect('likes.user', 'likeUser')
             .where('video.type != :storyType', { storyType: 'story' })
             .andWhere('user.role = :role', { role: UserRole.ADMIN })
             .orderBy('video.created_at', 'DESC')
-            .getMany();
+            .skip(skip)
+            .take(limit)
+            .getManyAndCount();
 
         const formatted = videos.map(v => ({
             id: v.uuid,
@@ -1485,20 +1542,28 @@ export class VideoService {
                 id: v.user_id.id,
                 username: v.user_id.username,
                 profilePic: v.user_id.userProfile?.ProfilePicture || '',
-                role: v.user_id.role
+                role: v.user_id.role,
             },
-            audio: v.audio ? { id: v.audio.uuid, title: v.audio.name } : null,
+            audio: v.audio
+                ? { id: v.audio.uuid, title: v.audio.name }
+                : null,
             hashtags: v.hashtags?.map(h => h.tag) || [],
             likesCount: v.likes?.length || 0,
             viewsCount: v.views?.length || 0,
             commentsCount: v.comments?.length || 0,
+            isLiked: v.likes?.some(like => like.user?.id === v.user_id.id) || false
+
         }));
 
         return {
             data: formatted,
-            total: formatted.length,
+            page,
+            limit,
+            total,
+            hasNextPage: skip + limit < total,
         };
     }
+
 
     async getVideosFeed(
         userId: string,
@@ -1589,7 +1654,6 @@ export class VideoService {
             isLiked: v.likes?.some(like => like.user?.id === userId) || false
         }));
 
-      console.log(formatted)
         return {
             data: formatted,
             page,

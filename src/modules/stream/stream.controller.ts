@@ -104,8 +104,11 @@ export class VideoController {
 
   @Get('getAdminVideosFeed')
   @UseGuards(JwtAuthGuard)
-  async getAdminVideosFeed() {
-    return this.videoService.getAdminVideosFeed();
+  async getAdminVideosFeed(
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+  ) {
+    return this.videoService.getAdminVideosFeed(Number(page), Number(limit));
   }
 
 
@@ -120,7 +123,7 @@ export class VideoController {
   ) {
     const user = req.user as { userId?: string };
     console.log("uuuuuuuuuuuuuuuuuuu", user);
-    
+
     if (!user?.userId) {
       throw new BadRequestException('Invalid or missing user ID in token.');
     }
