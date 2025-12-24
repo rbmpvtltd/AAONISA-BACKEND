@@ -180,8 +180,10 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Get('profile/:username')
-  async getProfileByUsername(@Param('username') username: string) {
-    return this.userService.getProfileByUsername(username);
+  async getProfileByUsername(@Req() req,@Param('username') username: string) {
+    const payload = req.user;
+    const userId = payload?.sub || payload?.id || payload?.userId;
+    return this.userService.getProfileByUsername(username, userId);
   }
 
   @UseGuards(JwtAuthGuard)

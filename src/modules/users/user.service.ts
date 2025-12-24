@@ -602,28 +602,28 @@ export class UserService {
   }
 
 
-async editUserRole(userId: string, newRole: UserRole) {
-  const user = await this.userRepository.findOne({
-    where: { id: userId },
-  });
+  async editUserRole(userId: string, newRole: UserRole) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
 
-  if (!user) {
-    throw new NotFoundException('User not found');
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!Object.values(UserRole).includes(newRole)) {
+      throw new BadRequestException('Invalid role');
+    }
+
+    user.role = newRole;
+    await this.userRepository.save(user);
+
+    return {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+    };
   }
-
-  if (!Object.values(UserRole).includes(newRole)) {
-    throw new BadRequestException('Invalid role');
-  }
-
-  user.role = newRole;
-  await this.userRepository.save(user);
-
-  return {
-    id: user.id,
-    username: user.username,
-    role: user.role,
-  };
-}
 
 
   // ===========================================================
@@ -644,7 +644,7 @@ async editUserRole(userId: string, newRole: UserRole) {
     return { success: true, userProfile: user };
   }
 
-  async getProfileByUsername(username: string) {
+  async getProfileByUsername(username: string, reqSenderUserId: string) {
     console.log('🔍 getProfileByUsername called for:', username);
 
     // Step 1: Get user info with profile
@@ -664,7 +664,7 @@ async editUserRole(userId: string, newRole: UserRole) {
     // Step 2: Followers (who follows this user)
     const followers = await this.followRepository
       .createQueryBuilder('follow')
-      .leftJoin('follow.follower', 'follower') // relation join
+      .leftJoin('follow.follower', 'follower')
       .leftJoin('follower.userProfile', 'followerProfile')
       .select([
         'follower.id AS id',
@@ -674,7 +674,6 @@ async editUserRole(userId: string, newRole: UserRole) {
       ])
       .where('follow.followingId = :userId', { userId })
       .getRawMany();
-
     // Step 3: Followings (whom this user follows)
     const followings = await this.followRepository
       .createQueryBuilder('follow')
@@ -689,6 +688,24 @@ async editUserRole(userId: string, newRole: UserRole) {
       .where('follow.followerId = :userId', { userId })
       .getRawMany();
 
+    const myFollowings = await this.followRepository
+      .createQueryBuilder('follow')
+      .select('follow.followingId', 'followingId')
+      .where('follow.followerId = :reqSenderUserId', { reqSenderUserId })
+      .getRawMany();
+
+    const myFollowingSet = new Set(
+      myFollowings.map(f => f.followingId)
+    );
+    const followersWithFlag = followers.map(follower => ({
+      ...follower,
+      followedByMe: myFollowingSet.has(follower.id)
+    }));
+    const followingsWithFlag = followings.map(following => ({
+      ...following,
+      followedByMe: myFollowingSet.has(following.id)
+    }));
+    console.log('Followings:', followingsWithFlag);
     // Step 4: Fetch user’s videos
     const videos = await this.videoRepository
       .createQueryBuilder('video')
@@ -730,8 +747,8 @@ async editUserRole(userId: string, newRole: UserRole) {
       phone_no: user.phone_no,
       role: user.role,
       userProfile: user.userProfile,
-      followers,
-      followings,
+      followersWithFlag,
+      followingsWithFlag,
       videos,
       mentionedVideos
     };
