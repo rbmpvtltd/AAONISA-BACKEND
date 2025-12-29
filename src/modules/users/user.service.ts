@@ -72,7 +72,9 @@ export class UserService {
 
 
   async register(dto: RegisterDto, res: Response) {
+  try {
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
+
     const isValidOtp = await this.otpService.validateOtp({
       email: isEmail ? dto.emailOrPhone : undefined,
       phone_no: !isEmail ? dto.emailOrPhone : undefined,
@@ -80,30 +82,57 @@ export class UserService {
     });
 
     if (!isValidOtp) {
-      throw new BadRequestException('Invalid or expired OTP');
-    }
-    const existingUser = await this.userRepository.findOne({
-      where: [
-        isEmail ? { email: dto.emailOrPhone } : { phone_no: dto.emailOrPhone },
-        { username: dto.username },
-      ],
-    });
-
-    if (existingUser) {
-      throw new BadRequestException('Email, phone number or username already in use');
+      return res.status(400).json({ 
+        statusCode: 400, 
+        message: 'Invalid or expired OTP', 
+        success: false 
+      });
     }
 
+    // Email / Phone check
+    if (isEmail) {
+      const existingEmail = await this.userRepository.findOne({ where: { email: dto.emailOrPhone } });
+      if (existingEmail) {
+        return res.status(400).json({
+          statusCode: 400,
+          message: 'Email already in use',
+          success: false,
+        });
+      }
+    } else {
+      const existingPhone = await this.userRepository.findOne({ where: { phone_no: dto.emailOrPhone } });
+      if (existingPhone) {
+        return res.status(400).json({
+          statusCode: 400,
+          message: 'Phone number already in use',
+          success: false,
+        });
+      }
+    }
+
+    // Username check
+    const existingUsername = await this.userRepository.findOne({ where: { username: dto.username } });
+    if (existingUsername) {
+      return res.status(400).json({
+        statusCode: 400,
+        message: 'Username already in use',
+        success: false,
+      });
+    }
+
+    // Hash password
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
+    // Create user
     const user = this.userRepository.create({
       username: dto.username,
       email: isEmail ? dto.emailOrPhone : undefined,
       phone_no: !isEmail ? dto.emailOrPhone : undefined,
       password: hashedPassword,
     });
-
     const savedUser = await this.userRepository.save(user);
 
+    // Create profile
     const userProfile = this.userProfileRepository.create({
       user_id: savedUser.id,
       name: savedUser.username,
@@ -111,13 +140,14 @@ export class UserService {
       paid: false,
       star: 1,
     });
-
     await this.userProfileRepository.save(userProfile);
 
+    // Generate tokens
     const tokens = this.authService.generateTokens({ sub: savedUser.id });
     savedUser.refreshToken = await bcrypt.hash(tokens.refreshToken, 10);
     await this.userRepository.save(savedUser);
 
+    // Set cookies
     res.cookie('accessToken', tokens.accessToken, {
       httpOnly: true, secure: true, sameSite: 'strict', maxAge: 15 * 60 * 1000,
     });
@@ -126,7 +156,17 @@ export class UserService {
     });
 
     return res.status(201).json({ message: 'User registered successfully', success: true });
+    
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      statusCode: 500,
+      message: 'Internal server error',
+      success: false,
+    });
   }
+}
+
 
 
   async login(dto: LoginDto, res: Response) {
