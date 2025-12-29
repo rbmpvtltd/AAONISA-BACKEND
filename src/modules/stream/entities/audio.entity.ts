@@ -15,6 +15,9 @@ export class Audio {
   @Column()
   author: string;
 
+  @Column()
+  src: string;
+  
   @OneToMany(() => Video, video => video.audio)
   videos: Video[];
 }

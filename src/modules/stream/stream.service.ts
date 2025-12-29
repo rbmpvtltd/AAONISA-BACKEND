@@ -77,16 +77,40 @@ export class VideoService {
             });
         });
     }
-    private async extractAudioFromVideo(videoPath: string, outputAudioPath: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            ffmpeg(videoPath)
-                .noVideo()
-                .audioCodec('libmp3lame')
-                .save(outputAudioPath)
-                .on('end', () => resolve())
-                .on('error', (err) => reject(err));
-        });
-    }
+    // private async extractAudioFromVideo(videoPath: string, outputAudioPath: string): Promise<void> {
+    //     return new Promise((resolve, reject) => {
+    //         ffmpeg(videoPath)
+    //             .noVideo()
+    //             .audioCodec('libmp3lame')
+    //             .save(outputAudioPath)
+    //             .on('end', () => resolve())
+    //             .on('error', (err) => reject(err));
+    //     });
+    // }
+    private async extractAudioFromVideo(
+    videoPath: string,
+    outputAudioPath: string,
+    startTime?: number,   // seconds
+    duration?: number    // seconds
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        let command = ffmpeg(videoPath).noVideo();
+
+        if (typeof startTime === 'number') {
+            command = command.setStartTime(startTime);
+        }
+
+        if (typeof duration === 'number') {
+            command = command.setDuration(duration);
+        }
+
+        command
+            .audioCodec('libmp3lame')
+            .save(outputAudioPath)
+            .on('end', () => resolve())
+            .on('error', (err) => reject(err));
+    });
+}
 
     private async compressVideoOverwrite(filePath: string): Promise<string> {
         const compressedPath = path.join(
@@ -870,7 +894,7 @@ export class VideoService {
         try {
             const user = await this.userRepository.findOne({ where: { id: userId } });
             if (!user) throw new BadRequestException('User not found. Invalid token.');
-
+            console.log('dto', createVideoDto);
             // 1️⃣ Handle mentions immediately
             const overlayMentions = createVideoDto.overlays
                 .filter(item => item.text.startsWith('@'))
@@ -1061,22 +1085,35 @@ export class VideoService {
 
             /* =======================
    3️⃣ AUDIO (FULL FLOW)
-======================= */
+   ======================= */
+
             let audio: Audio | null = null;
             let externalAudioSrc = '';
 
-            if (createVideoDto.music) {
+            const music = createVideoDto.music;
+            console.log('🎵 Music:', music);
+            if (music) {
 
-                // 🟢 CASE 1: Existing audio (UUID)
-                if (createVideoDto.music.id && uuidValidate(createVideoDto.music.id)) {
-                    console.log('🎵 Using existing audio');
-                    audio = await this.audioRepository.findOne({
-                        where: { uuid: createVideoDto.music.id },
-                    });
+                // 🔵 CASE 1: External audio (highest priority)
+                if (music.uri) {
+                    console.log('🌍 External audio detected');
+                    externalAudioSrc = music.uri;
                 }
 
-                // 🟡 CASE 2: Extract audio from video
-                else if (createVideoDto.music.id) {
+                // 🟢 CASE 2: Existing uploaded audio (UUID)
+                else if (music.id && uuidValidate(music.id)) {
+                    console.log('🎵 Using existing audio');
+
+                    audio = await this.audioRepository.findOne({
+                        where: { uuid: music.id },
+                    });
+                    if(!audio) {
+                        throw new BadRequestException('Audio not found');
+                    }
+                }
+            }
+                else {
+                    // 🟡 CASE 3: Extract audio from video (fallback)
                     console.log('🎧 Extracting audio from video');
 
                     const audioFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.mp3`;
@@ -1092,33 +1129,30 @@ export class VideoService {
                     }
 
                     const hasAudio = await this.checkIfVideoHasAudio(videoPath);
-
                     if (hasAudio) {
-                        await this.extractAudioFromVideo(videoPath, audioPath);
+                        try {
+                            await this.extractAudioFromVideo(videoPath, audioPath,createVideoDto.trimStart, createVideoDto.trimEnd);
 
-                        const uploadedAudio = await this.uploadService.uploadFile(
-                            audioPath,
-                            'audios',
-                        );
+                            const uploadedAudio = await this.uploadService.uploadFile(
+                                audioPath,
+                                'audios',
+                            );
+                            audio = this.audioRepository.create({
+                                uuid: uuidv4(),
+                                name: createVideoDto.title || 'Audio',
+                                src: uploadedAudio.publicUrl,
+                                category: 'auto-extracted',
+                                author: data.userId,
+                            });
 
-                        audio = this.audioRepository.create({
-                            uuid: uuidv4(),
-                            name: uploadedAudio.publicUrl, // 🔥 AUDIO URL
-                            category: 'auto-extracted',
-                            author: data.userId,
-                        });
-
-                        await this.audioRepository.save(audio);
-                        fs.unlinkSync(audioPath);
+                            await this.audioRepository.save(audio);
+                        } finally {
+                            if (fs.existsSync(audioPath)) {
+                                fs.unlinkSync(audioPath);
+                            }
+                        }
                     }
                 }
-
-                // 🔵 CASE 3: External audio URL
-                if (!audio && createVideoDto.music.uri) {
-                    console.log('🌍 External audio detected');
-                    externalAudioSrc = createVideoDto.music.uri;
-                }
-            }
 
 
             /* =======================
