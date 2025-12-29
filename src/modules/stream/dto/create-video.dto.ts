@@ -64,10 +64,10 @@ export class CreateVideoDto {
   duration?: number;
 
   @IsString()
-  trimStart: string;
+  trimStart: number;
 
   @IsString()
-  trimEnd: string;
+  trimEnd: number;
 
   @IsString()
   videoVolume: string;
