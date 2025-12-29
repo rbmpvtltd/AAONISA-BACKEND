@@ -127,7 +127,7 @@ export class BookmarkService {
             reels: bookmark.reels.map(reel => ({
                 uuid: reel.uuid,
                 user: {
-                    userProfile: reel.user_id.userProfile.ProfilePicture,
+                    userProfile: reel.user_id.userProfile.ProfilePicture || null,
                     username: reel.user_id.username
                 },
                 title: reel.title,
