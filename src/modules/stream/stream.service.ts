@@ -87,30 +87,30 @@ export class VideoService {
     //             .on('error', (err) => reject(err));
     //     });
     // }
-    private async extractAudioFromVideo(
+ private async extractAudioFromVideo(
     videoPath: string,
     outputAudioPath: string,
-    startTime?: number,   // seconds
-    duration?: number    // seconds
+    startTime: number,
+    duration: number
 ): Promise<void> {
     return new Promise((resolve, reject) => {
-        let command = ffmpeg(videoPath).noVideo();
-
-        if (typeof startTime === 'number') {
-            command = command.setStartTime(startTime);
-        }
-
-        if (typeof duration === 'number') {
-            command = command.setDuration(duration);
-        }
-
-        command
-            .audioCodec('libmp3lame')
-            .save(outputAudioPath)
-            .on('end', () => resolve())
-            .on('error', (err) => reject(err));
+        ffmpeg(videoPath)
+            .outputOptions([
+                `-ss ${startTime}`,
+                `-t ${duration}`,
+                '-vn',
+                '-acodec libmp3lame'
+            ])
+            .on('start', (cmd) => {
+                console.log('FFmpeg CMD:', cmd);
+            })
+            .on('end', resolve)
+            .on('error', reject)
+            .save(outputAudioPath);
     });
 }
+
+
 
     private async compressVideoOverwrite(filePath: string): Promise<string> {
         const compressedPath = path.join(
