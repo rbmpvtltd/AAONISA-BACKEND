@@ -120,16 +120,17 @@ export class BookmarkService {
                 'reels.user_id.userProfile',
             ],
         });
-
+        console.log(bookmarks[0].reels[0].user_id.userProfile)
         const transformed = bookmarks.map(bookmark => ({
             id: bookmark.id,
             name: bookmark.name,
             reels: bookmark.reels.map(reel => ({
                 uuid: reel.uuid,
                 user: {
-                    userProfile: reel.user_id.userProfile.ProfilePicture || null,
+                    userProfile: reel.user_id.userProfile?.ProfilePicture ?? null,
                     username: reel.user_id.username
                 },
+
                 title: reel.title,
                 caption: reel.caption,
                 videoUrl: reel.videoUrl,
@@ -204,7 +205,7 @@ export class BookmarkService {
             relations: ['reels'], // important
         });
         if (!bookmark) throw new NotFoundException('Bookmark not found');
-        if(!dto.reelId) throw new BadRequestException('No reel IDs provided to add')
+        if (!dto.reelId) throw new BadRequestException('No reel IDs provided to add')
         // Nayi reels lao
         const newReels = await this.reelRepo.find({
             where: { uuid: dto.reelId },
@@ -252,14 +253,14 @@ export class BookmarkService {
         const user = await this.userRepo.findOne({
             where: { id: userId },
         });
-        console.log("bookmark name ",dto)
+        console.log("bookmark name ", dto)
         if (!user) throw new NotFoundException('User not found');
         const bookmark = await this.bookmarkRepo.findOne({
             where: { name: dto.name, user: { id: userId } },
             relations: ['reels'], // zaruri hai
         });
         if (!bookmark) throw new NotFoundException('Bookmark not found');
-        console.log("reelId ",dto.reelId)
+        console.log("reelId ", dto.reelId)
         if (!dto.reelId?.length) {
             throw new BadRequestException('No reel IDs provided to remove');
         }
