@@ -1600,103 +1600,111 @@ export class VideoService {
 
 
     async getVideosFeed(
-        userId: string,
-        feedType: 'followings' | 'news' | 'explore',
-        page = 1,
-        limit = 10,
-        random = false // 👈 NEW FLAG
-    ) {
-        const skip = (page - 1) * limit;
+    userId: string,
+    feedType: 'followings' | 'news' | 'explore',
+    page = 1,
+    limit = 10,
+    random = false
+) {
+    const skip = (page - 1) * limit;
 
-        const query = this.videoRepository
-            .createQueryBuilder('video')
-            .leftJoinAndSelect('video.user_id', 'user')
-            .leftJoinAndSelect('user.userProfile', 'userProfile')
-            .leftJoinAndSelect('video.audio', 'audio')
-            .leftJoinAndSelect('video.hashtags', 'hashtags')
-            .leftJoinAndSelect('video.likes', 'likes')
-            .leftJoinAndSelect('likes.user', 'likeUser')
-            .leftJoinAndSelect('video.comments', 'comments')
-            .leftJoinAndSelect('video.views', 'views')
-            // .leftJoinAndSelect('likes.user', 'likeUser')
+    // Base query
+    const baseQuery = this.videoRepository
+        .createQueryBuilder('video')
+        .leftJoinAndSelect('video.user_id', 'user')
+        .leftJoinAndSelect('user.userProfile', 'userProfile')
+        .leftJoinAndSelect('video.audio', 'audio')
+        .leftJoinAndSelect('video.hashtags', 'hashtags')
+        .leftJoinAndSelect('video.likes', 'likes')
+        .leftJoinAndSelect('likes.user', 'likeUser')
+        .leftJoinAndSelect('video.comments', 'comments')
+        .leftJoinAndSelect('video.views', 'views')
+        .where('video.type != :storyType', { storyType: 'story' });
 
-            .where('video.type != :storyType', { storyType: 'story' });
+    /* ================= FEED TYPE LOGIC ================= */
+    if (feedType === 'followings') {
+        const followings = await this.followRepository.find({
+            where: { follower: { id: userId } },
+            relations: ['following'],
+        });
+        const followingIds = followings.map(f => f.following.id);
 
-        /* ================= FEED TYPE LOGIC ================= */
-
-        if (feedType === 'followings') {
-            const followings = await this.followRepository.find({
-                where: { follower: { id: userId } },
-                relations: ['following'],
-            });
-
-            const followingIds = followings.map(f => f.following.id);
-
-            if (!followingIds.length) {
-                return { data: [], page, limit, total: 0, totalPages: 0 };
-            }
-
-            query.andWhere('video.user_id IN (:...followingIds)', { followingIds });
-
-        } else if (feedType === 'news') {
-            query.andWhere('video.type = :newsType', { newsType: 'news' });
-
-        } else if (feedType === 'explore') {
-            query.andWhere(
-                '(video.type = :reelsType OR video.type = :newsType)',
-                { reelsType: 'reels', newsType: 'news' }
-            );
+        if (!followingIds.length) {
+            return { data: [], page, limit, total: 0, totalPages: 0, random };
         }
 
-        /* ================= ORDERING LOGIC ================= */
+        baseQuery.andWhere('video.user_id IN (:...followingIds)', { followingIds });
 
-        if (random) {
-            // PostgreSQL → RANDOM(), MySQL → RAND()
-            query.orderBy('RANDOM()');
-        } else {
-            query.orderBy('video.created_at', 'DESC');
-        }
+    } else if (feedType === 'news') {
+        baseQuery.andWhere('video.type = :newsType', { newsType: 'news' });
 
-        /* ================= PAGINATION ================= */
-
-        query.skip(skip).take(limit);
-
-        const [videos, total] = await query.getManyAndCount();
-
-        /* ================= RESPONSE FORMAT ================= */
-
-        const formatted = videos.map(v => ({
-            id: v.uuid,
-            title: v.title,
-            caption: v.caption,
-            videoUrl: v.videoUrl,
-            type: v.type,
-            created_at: v.created_at,
-            thumbnailUrl: v.thumbnailUrl,
-            duration: v.duration || 15,
-            user: {
-                id: v.user_id.id,
-                username: v.user_id.username,
-                profilePic: v.user_id.userProfile?.ProfilePicture || '',
-            },
-            audio: v.audio ? { id: v.audio.uuid, title: v.audio.name } : null,
-            hashtags: v.hashtags?.map(h => h.tag) || [],
-            likesCount: v.likes?.length || 0,
-            viewsCount: v.views?.length || 0,
-            commentsCount: v.comments?.length || 0,
-
-            isLiked: v.likes?.some(like => like.user?.id === userId) || false
-        }));
-
-        return {
-            data: formatted,
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-            random, // 👈 helpful for frontend
-        };
+    } else if (feedType === 'explore') {
+        baseQuery.andWhere(
+            '(video.type = :reelsType OR video.type = :newsType)',
+            { reelsType: 'reels', newsType: 'news' }
+        );
     }
+
+    /* ================= RANDOM LOGIC ================= */
+    let videos: any[] = [];
+    let total = 0;
+
+    if (random) {
+        total = await baseQuery.getCount();
+        if (total === 0) return { data: [], page, limit, total: 0, totalPages: 0, random };
+
+        // Generate random offsets
+        const randomOffsets = new Set<number>();
+        while (randomOffsets.size < Math.min(limit, total)) {
+            randomOffsets.add(Math.floor(Math.random() * total));
+        }
+
+        // Fetch videos at random offsets
+        for (const offset of randomOffsets) {
+            const [video] = await baseQuery.skip(offset).take(1).getMany();
+            if (video) videos.push(video);
+        }
+
+    } else {
+        // Normal pagination
+        baseQuery.orderBy('video.created_at', 'DESC');
+        baseQuery.skip(skip).take(limit);
+        [videos, total] = await baseQuery.getManyAndCount();
+    }
+
+    /* ================= RESPONSE FORMAT ================= */
+    const formatted = videos.map(v => ({
+        id: v.uuid,
+        title: v.title,
+        caption: v.caption,
+        videoUrl: v.videoUrl,
+        type: v.type,
+        created_at: v.created_at,
+        thumbnailUrl: v.thumbnailUrl,
+        duration: v.duration || 15,
+        user: {
+            id: v.user_id.id,
+            username: v.user_id.username,
+            profilePic: v.user_id.userProfile?.ProfilePicture || '',
+        },
+        audio: v.audio ? { id: v.audio.uuid, title: v.audio.name } : null,
+        hashtags: v.hashtags?.map(h => h.tag) || [],
+        likesCount: v.likes?.length || 0,
+        viewsCount: v.views?.length || 0,
+        commentsCount: v.comments?.length || 0,
+        isLiked: v.likes?.some(like => like.user?.id === userId) || false
+    }));
+
+    return {
+        data: formatted,
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        random
+    };
+}
+
 
     async getExploreVideosWithMain(
         videoId: string,
