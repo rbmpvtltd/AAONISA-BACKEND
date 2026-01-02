@@ -12,7 +12,7 @@ export class ShareController {
     @ApiBody({ type: ShareDto })
     create(@Req() req: any, @Body() dto: ShareDto) {
         const userId = req.user.userId
-        return this.shareService.createshare(dto, userId);
+        return this.shareService.createShare(dto, userId);
     }
 
     //   @Get('post/:postId')

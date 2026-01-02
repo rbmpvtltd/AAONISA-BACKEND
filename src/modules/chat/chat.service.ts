@@ -5,6 +5,7 @@ import { ChatSession } from './entities/chat-session.entity';
 import { Chat } from './entities/chat.entity';
 import { User } from '../users/entities/user.entity';
 import { Video } from '../stream/entities/video.entity';
+import { Share } from '../share/entities/share.entity';
 @Injectable()
 export class ChatService {
     constructor(
@@ -19,6 +20,9 @@ export class ChatService {
 
         @InjectRepository(Video)
         private readonly videoRepo: Repository<Video>,
+
+        @InjectRepository(Share)
+        private readonly shareRepo: Repository<Share>,
     ) { }
 
     async createSession(senderId: string, receiverId: string) {
