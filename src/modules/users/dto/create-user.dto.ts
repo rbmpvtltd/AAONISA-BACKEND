@@ -43,9 +43,9 @@ export class RegisterDto {
   @MinLength(6)
   password: string;
 
-  @IsOptional()
+  // @IsOptional()
   @IsString()
-  username?: string;
+  username: string;
 
   @IsOptional()
   @IsEnum(UserRole)

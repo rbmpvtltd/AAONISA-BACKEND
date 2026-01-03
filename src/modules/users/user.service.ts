@@ -42,38 +42,210 @@ export class UserService {
     private readonly tokenService: TokenService
   ) { }
 
-  async preRegisterCheck(dto: { emailOrPhone: string; username: string }) {
-    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
+private async checkUserAvailability(
+  emailOrPhone: string,
+  username: string,
+) {
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailOrPhone);
 
-    const existingUser = await this.userRepository.findOne({
-      where: [
-        isEmail ? { email: dto.emailOrPhone } : { phone_no: dto.emailOrPhone },
-        { username: dto.username },
-      ],
-    });
-
-    if (existingUser) {
-      throw new BadRequestException('Email, phone number or username already in use');
+  // Check email or phone separately
+  if (isEmail) {
+    const existingEmail = await this.userRepository.findOne({ where: { email: emailOrPhone } });
+    if (existingEmail) {
+      return {
+        success: false,
+        field: 'email',
+        message: 'Email already in use',
+      };
     }
-
-    const otp = await this.otpService.generateOtp({
-      email: isEmail ? dto.emailOrPhone : undefined,
-      phone_no: !isEmail ? dto.emailOrPhone : undefined,
-    });
-
-    if (isEmail) {
-      await this.emailService.sendOtp(dto.emailOrPhone, otp);
-    } else {
-      await this.smsService.sendOtpSms(dto.emailOrPhone, otp);
+  } else {
+    const existingPhone = await this.userRepository.findOne({ where: { phone_no: emailOrPhone } });
+    if (existingPhone) {
+      return {
+        success: false,
+        field: 'phone',
+        message: 'Phone number already in use',
+      };
     }
-
-    return { message: 'OTP sent for verification', success: true };
   }
 
+  // Check username separately
+  const existingUsername = await this.userRepository.findOne({ where: { username } });
+  if (existingUsername) {
+    return {
+      success: false,
+      field: 'username',
+      message: 'Username already in use',
+    };
+  }
 
-  async register(dto: RegisterDto, res: Response) {
+  return { success: true, isEmail };
+}
+
+  // async preRegisterCheck(dto: { emailOrPhone: string; username: string }) {
+  //   const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
+
+  //   const existingUser = await this.userRepository.findOne({
+  //     where: [
+  //       isEmail ? { email: dto.emailOrPhone } : { phone_no: dto.emailOrPhone },
+  //       { username: dto.username },
+  //     ],
+  //   });
+
+  //   if (existingUser) {
+  //     throw new BadRequestException('Email, phone number or username already in use');
+  //   }
+
+  //   const otp = await this.otpService.generateOtp({
+  //     email: isEmail ? dto.emailOrPhone : undefined,
+  //     phone_no: !isEmail ? dto.emailOrPhone : undefined,
+  //   });
+
+  //   if (isEmail) {
+  //     await this.emailService.sendOtp(dto.emailOrPhone, otp);
+  //   } else {
+  //     await this.smsService.sendOtpSms(dto.emailOrPhone, otp);
+  //   }
+
+  //   return { message: 'OTP sent for verification', success: true };
+  // }
+  async preRegisterCheck(dto: { emailOrPhone: string; username: string }) {
+  const check = await this.checkUserAvailability(dto.emailOrPhone, dto.username);
+    console.log('check', check)
+  if (!check.success) {
+    return {
+      statusCode: 400,
+      message: check.message,
+      success: false,
+      field: check.field,
+    };
+  }
+
+  const otp = await this.otpService.generateOtp({
+    email: check.isEmail ? dto.emailOrPhone : undefined,
+    phone_no: !check.isEmail ? dto.emailOrPhone : undefined,
+  });
+
+  if (check.isEmail) {
+    await this.emailService.sendOtp(dto.emailOrPhone, otp);
+  } else {
+    await this.smsService.sendOtpSms(dto.emailOrPhone, otp);
+  }
+
+  return { message: 'OTP sent for verification', success: true };
+}
+
+
+//   async register(dto: RegisterDto, res: Response) {
+//   try {
+//     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
+
+//     const isValidOtp = await this.otpService.validateOtp({
+//       email: isEmail ? dto.emailOrPhone : undefined,
+//       phone_no: !isEmail ? dto.emailOrPhone : undefined,
+//       code: dto.otp,
+//     });
+
+//     if (!isValidOtp) {
+//       return res.status(400).json({ 
+//         statusCode: 400, 
+//         message: 'Invalid or expired OTP', 
+//         success: false 
+//       });
+//     }
+
+//     // Email / Phone check
+//     if (isEmail) {
+//       const existingEmail = await this.userRepository.findOne({ where: { email: dto.emailOrPhone } });
+//       if (existingEmail) {
+//         return res.status(400).json({
+//           statusCode: 400,
+//           message: 'Email already in use',
+//           success: false,
+//         });
+//       }
+//     } else {
+//       const existingPhone = await this.userRepository.findOne({ where: { phone_no: dto.emailOrPhone } });
+//       if (existingPhone) {
+//         return res.status(400).json({
+//           statusCode: 400,
+//           message: 'Phone number already in use',
+//           success: false,
+//         });
+//       }
+//     }
+
+//     // Username check
+//     const existingUsername = await this.userRepository.findOne({ where: { username: dto.username } });
+//     if (existingUsername) {
+//       return res.status(400).json({
+//         statusCode: 400,
+//         message: 'Username already in use',
+//         success: false,
+//       });
+//     }
+
+//     // Hash password
+//     const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+//     // Create user
+//     const user = this.userRepository.create({
+//       username: dto.username,
+//       email: isEmail ? dto.emailOrPhone : undefined,
+//       phone_no: !isEmail ? dto.emailOrPhone : undefined,
+//       password: hashedPassword,
+//     });
+//     const savedUser = await this.userRepository.save(user);
+
+//     // Create profile
+//     const userProfile = this.userProfileRepository.create({
+//       user_id: savedUser.id,
+//       name: savedUser.username,
+//       role: dto.role,
+//       paid: false,
+//       star: 1,
+//     });
+//     await this.userProfileRepository.save(userProfile);
+
+//     // Generate tokens
+//     const tokens = this.authService.generateTokens({ sub: savedUser.id });
+//     savedUser.refreshToken = await bcrypt.hash(tokens.refreshToken, 10);
+//     await this.userRepository.save(savedUser);
+
+//     // Set cookies
+//     res.cookie('accessToken', tokens.accessToken, {
+//       httpOnly: true, secure: true, sameSite: 'strict', maxAge: 15 * 60 * 1000,
+//     });
+//     res.cookie('refreshToken', tokens.refreshToken, {
+//       httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000,
+//     });
+
+//     return res.status(201).json({ message: 'User registered successfully', success: true });
+    
+//   } catch (err) {
+//     console.error(err);
+//     return res.status(500).json({
+//       statusCode: 500,
+//       message: 'Internal server error',
+//       success: false,
+//     });
+//   }
+// }
+
+async register(dto: RegisterDto, res: Response) {
   try {
-    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
+    const isEmail = await this.checkUserAvailability(
+      dto.emailOrPhone,
+      dto.username,
+    );
+    
+    if (!isEmail.success) {
+      return res.status(400).json({
+        statusCode: 400,
+        message: 'Email or phone number already in use',
+        success: false,
+      });
+    }
 
     const isValidOtp = await this.otpService.validateOtp({
       email: isEmail ? dto.emailOrPhone : undefined,
@@ -82,57 +254,25 @@ export class UserService {
     });
 
     if (!isValidOtp) {
-      return res.status(400).json({ 
-        statusCode: 400, 
-        message: 'Invalid or expired OTP', 
-        success: false 
-      });
-    }
-
-    // Email / Phone check
-    if (isEmail) {
-      const existingEmail = await this.userRepository.findOne({ where: { email: dto.emailOrPhone } });
-      if (existingEmail) {
-        return res.status(400).json({
-          statusCode: 400,
-          message: 'Email already in use',
-          success: false,
-        });
-      }
-    } else {
-      const existingPhone = await this.userRepository.findOne({ where: { phone_no: dto.emailOrPhone } });
-      if (existingPhone) {
-        return res.status(400).json({
-          statusCode: 400,
-          message: 'Phone number already in use',
-          success: false,
-        });
-      }
-    }
-
-    // Username check
-    const existingUsername = await this.userRepository.findOne({ where: { username: dto.username } });
-    if (existingUsername) {
       return res.status(400).json({
         statusCode: 400,
-        message: 'Username already in use',
+        message: 'Invalid or expired OTP',
         success: false,
       });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
-    // Create user
     const user = this.userRepository.create({
       username: dto.username,
       email: isEmail ? dto.emailOrPhone : undefined,
       phone_no: !isEmail ? dto.emailOrPhone : undefined,
       password: hashedPassword,
     });
+
     const savedUser = await this.userRepository.save(user);
 
-    // Create profile
+// Create profile
     const userProfile = this.userProfileRepository.create({
       user_id: savedUser.id,
       name: savedUser.username,
@@ -156,17 +296,15 @@ export class UserService {
     });
 
     return res.status(201).json({ message: 'User registered successfully', success: true });
-    
   } catch (err) {
     console.error(err);
     return res.status(500).json({
       statusCode: 500,
-      message: 'Internal server error',
+      message: err.message || 'Internal server error',
       success: false,
     });
   }
 }
-
 
 
   async login(dto: LoginDto, res: Response) {
