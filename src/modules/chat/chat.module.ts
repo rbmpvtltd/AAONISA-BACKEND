@@ -6,10 +6,11 @@ import { Chat } from './entities/chat.entity';
 import { ChatSession } from './entities/chat-session.entity';
 import { User } from '../users/entities/user.entity';
 import { Video } from '../stream/entities/video.entity';
+import { Share } from '../share/entities/share.entity';
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ChatSession, Chat, User,Video]),
+    TypeOrmModule.forFeature([ChatSession, Chat, User,Video,Share]),
   ],
   controllers: [ChatController],
   providers: [ChatService],

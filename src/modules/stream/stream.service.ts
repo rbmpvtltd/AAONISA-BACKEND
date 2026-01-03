@@ -1619,6 +1619,7 @@ export class VideoService {
         .leftJoinAndSelect('likes.user', 'likeUser')
         .leftJoinAndSelect('video.comments', 'comments')
         .leftJoinAndSelect('video.views', 'views')
+        .leftJoinAndSelect('video.shares','shares')
         .where('video.type != :storyType', { storyType: 'story' });
 
     /* ================= FEED TYPE LOGIC ================= */
@@ -1692,6 +1693,7 @@ export class VideoService {
         likesCount: v.likes?.length || 0,
         viewsCount: v.views?.length || 0,
         commentsCount: v.comments?.length || 0,
+        shareCount: v.shares?.length || 0,
         isLiked: v.likes?.some(like => like.user?.id === userId) || false
     }));
 
@@ -1719,6 +1721,9 @@ export class VideoService {
             .leftJoinAndSelect('video.hashtags', 'hashtags')
             .leftJoinAndSelect('video.likes', 'likes')
             .leftJoinAndSelect('video.views', 'views')
+            .leftJoinAndSelect('likes.user', 'likeUser')
+            .leftJoinAndSelect('video.comments', 'comments')
+            .leftJoinAndSelect('video.shares','shares')
             .where('video.uuid = :videoId', { videoId })
             .andWhere('video.type IN (:...types)', { types: ['reels', 'news'] })
             .getOne();
@@ -1736,6 +1741,9 @@ export class VideoService {
             .leftJoinAndSelect('video.hashtags', 'hashtags')
             .leftJoinAndSelect('video.likes', 'likes')
             .leftJoinAndSelect('video.views', 'views')
+            .leftJoinAndSelect('likes.user', 'likeUser')
+            .leftJoinAndSelect('video.comments', 'comments')
+            .leftJoinAndSelect('video.shares','shares')
             .where('video.type IN (:...types)', { types: ['reels', 'news'] })
             .andWhere('video.uuid != :videoId', { videoId })
             .orderBy('RANDOM()')
@@ -1764,6 +1772,7 @@ export class VideoService {
             hashtags: v.hashtags?.map(h => h.tag) || [],
             likesCount: v.likes?.length || 0,
             viewsCount: v.views?.length || 0,
+            shareCount: v.shares?.length || 0,
         }));
         return {
             data: formatted,
