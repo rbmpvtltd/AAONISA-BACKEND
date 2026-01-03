@@ -254,49 +254,113 @@ export class ChatService {
         });
     }
      
-    async shareReelMultiple(senderId: string, reelId: string, sessionIds: number[]) {
-    if (!sessionIds?.length) {
-        throw new BadRequestException("sessionIds array is required");
-    }
-    const reel = await this.videoRepo.findOneBy({ uuid: reelId });
-    if (!reel) {
-        throw new NotFoundException("Reel not found");
-    }
-    // 1. Get Reel data (replace with your own reel table logic)
-    const reelURL = reel.videoUrl;
-    const thumbURL = reel.thumbnailUrl;
+//     async shareReelMultiple(senderId: string, reelId: string, sessionIds: number[]) {
+//     if (!sessionIds?.length) {
+//         throw new BadRequestException("sessionIds array is required");
+//     }
+//     const reel = await this.videoRepo.findOneBy({ uuid: reelId });
+//     if (!reel) {
+//         throw new NotFoundException("Reel not found");
+//     }
+//     // 1. Get Reel data (replace with your own reel table logic)
+//     const reelURL = reel.videoUrl;
+//     const thumbURL = reel.thumbnailUrl;
 
-    // 2. Fixed format message
-    const messagePayload = {
-        type: "reel",
-        reelId,
-        url: reelURL,
-        thumbnail: thumbURL
-    };
-    for (const sessionId of sessionIds) {
-        // 3. Validate session
-        const session = await this.chatSessionRepo.findOne({
-            where: { session_id: sessionId },
-        });
+//     // 2. Fixed format message
+//     const messagePayload = {
+//         type: "reel",
+//         reelId,
+//         url: reelURL,
+//         thumbnail: thumbURL
+//     };
+//     for (const sessionId of sessionIds) {
+//         // 3. Validate session
+//         const session = await this.chatSessionRepo.findOne({
+//             where: { session_id: sessionId },
+//         });
 
-        if (!session) continue; // Skip invalid sessions
+//         if (!session) continue; // Skip invalid sessions
 
-        // 4. Validate sender
-        const sender = await this.userRepo.findOneBy({ id: senderId });
-        if (!sender) throw new NotFoundException("Sender not found");
+//         // 4. Validate sender
+//         const sender = await this.userRepo.findOneBy({ id: senderId });
+//         if (!sender) throw new NotFoundException("Sender not found");
 
-        // 5. Create message
-        const chat = this.chatRepo.create({
-            session,
-            sender,
-            message_text: JSON.stringify(messagePayload), // <-- IMPORTANT
-        });
-        await this.chatRepo.save(chat);
-    }
+//         // 5. Create message
+//         const chat = this.chatRepo.create({
+//             session,
+//             sender,
+//             message_text: JSON.stringify(messagePayload), // <-- IMPORTANT
+//         });
+//         await this.chatRepo.save(chat);
+//     }
 
-    return {
-        success: true,
-    };
+//     return {
+//         success: true,
+//     };
+// }
+async shareReelMultiple(
+  senderId: string,
+  reelId: string,
+  sessionIds: number[],
+) {
+  if (!sessionIds?.length) {
+    throw new BadRequestException("sessionIds array is required");
+  }
+
+  const reel = await this.videoRepo.findOneBy({ uuid: reelId });
+  if (!reel) {
+    throw new NotFoundException("Reel not found");
+  }
+
+  const sender = await this.userRepo.findOneBy({ id: senderId });
+  if (!sender) {
+    throw new NotFoundException("Sender not found");
+  }
+
+  const messagePayload = {
+    type: "reel",
+    reelId,
+    url: reel.videoUrl,
+    thumbnail: reel.thumbnailUrl,
+  };
+
+  for (const sessionId of sessionIds) {
+    const session = await this.chatSessionRepo.findOne({
+      where: { session_id: sessionId },
+      relations: ["user1", "user2"], // IMPORTANT
+    });
+
+    if (!session) continue;
+
+    // 🔑 Receiver identify
+    const receiver =
+      session.user1.id === senderId ? session.user2 : session.user1;
+
+    if (!receiver) continue;
+
+    // 📨 Chat message save
+    const chat = this.chatRepo.create({
+      session,
+      sender,
+      message_text: JSON.stringify(messagePayload),
+    });
+    await this.chatRepo.save(chat);
+
+    // 📊 Share table entry
+    const share = this.shareRepo.create({
+      reel_id: reelId,
+      shared_by_user_id: senderId,
+      shared_to_user_id: receiver.id,
+    });
+
+    await this.shareRepo.save(share);
+  }
+
+  return {
+    success: true,
+    message: "Reel shared successfully",
+  };
 }
+
 
 }

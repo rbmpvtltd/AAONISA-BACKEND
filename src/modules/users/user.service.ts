@@ -753,6 +753,7 @@ export class UserService {
       .leftJoinAndSelect('video.hashtags', 'hashtags')
       .leftJoinAndSelect('video.likes', 'likes')
       .leftJoinAndSelect('video.views', 'views')
+      .leftJoinAndSelect('video.shares', 'shares')
       .leftJoinAndSelect('video.comments', 'comments')
       .leftJoinAndSelect('likes.user', 'likeUser')
       .where('video.user_id = :userId', { userId })
@@ -768,6 +769,7 @@ export class UserService {
       .leftJoinAndSelect('video.hashtags', 'hashtags')
       .leftJoinAndSelect('video.likes', 'likes')
       .leftJoinAndSelect('video.views', 'views')
+      .leftJoinAndSelect('video.shares', 'shares')
       .leftJoinAndSelect('likes.user', 'likeUser')
       .leftJoinAndSelect('video.comments', 'comments')
       .leftJoin('video.mentions', 'mention')
@@ -783,12 +785,12 @@ export class UserService {
 
     const formattedVideos = videos.map(video => ({
       ...video,
-      isLiked: video.likes?.some(like => like.user?.id === userId) || false,
+      isLiked: video.likes?.some(like => like.user?.id === reqSenderUserId) || false,
       likesCount: video.likes?.length || 0,
       commentsCount: video.comments?.length || 0,
       viewsCount: video.views?.length || 0,
+      sharesCount: video.shares?.length || 0
     }));
-
     // Step 4: Final response
     return {
       id: user.id,

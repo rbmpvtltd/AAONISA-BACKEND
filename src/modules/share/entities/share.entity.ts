@@ -26,11 +26,14 @@
 
 // src/share/entities/share.entity.ts
 
+import { Video } from 'src/modules/stream/entities/video.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 
 @Entity('shares')
@@ -52,4 +55,10 @@ export class Share {
 
   @CreateDateColumn()
   createdAt: Date;
+
+  // Share entity
+@ManyToOne(() => Video, video => video.shares, { onDelete: 'CASCADE' })
+@JoinColumn({ name: 'reel_id' })
+reel: Video;
+
 }

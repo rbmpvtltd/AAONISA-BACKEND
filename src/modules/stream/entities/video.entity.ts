@@ -17,6 +17,7 @@ import { Hashtag } from './hashtag.entity';
 import { Bookmark } from 'src/modules/bookmark/entities/bookmark.entity';
 import { Comment } from 'src/modules/comments/entities/comment.entity';
 import { Report } from 'src/modules/reports/entities/report.entity';
+import { Share } from 'src/modules/share/entities/share.entity';
 
 export enum VideoType {
   news = 'news',
@@ -103,5 +104,9 @@ export class Video {
   onDelete: 'CASCADE',
 })
 reports: Report[];
+
+// Video entity
+@OneToMany(() => Share, share => share.reel)
+shares: Share[];
 
 }
