@@ -107,8 +107,9 @@ export class VideoController {
   async getAdminVideosFeed(
     @Query('page') page = 1,
     @Query('limit') limit = 10,
+    @Query('random') random = false
   ) {
-    return this.videoService.getAdminVideosFeed(Number(page), Number(limit));
+    return this.videoService.getAdminVideosFeed(Number(page), Number(limit), Boolean(random));
   }
 
 
