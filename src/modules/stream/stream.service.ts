@@ -87,28 +87,28 @@ export class VideoService {
     //             .on('error', (err) => reject(err));
     //     });
     // }
- private async extractAudioFromVideo(
-    videoPath: string,
-    outputAudioPath: string,
-    startTime: number,
-    duration: number
-): Promise<void> {
-    return new Promise((resolve, reject) => {
-        ffmpeg(videoPath)
-            .outputOptions([
-                `-ss ${startTime}`,
-                `-t ${duration}`,
-                '-vn',
-                '-acodec libmp3lame'
-            ])
-            .on('start', (cmd) => {
-                console.log('FFmpeg CMD:', cmd);
-            })
-            .on('end', resolve)
-            .on('error', reject)
-            .save(outputAudioPath);
-    });
-}
+    private async extractAudioFromVideo(
+        videoPath: string,
+        outputAudioPath: string,
+        startTime: number,
+        duration: number
+    ): Promise<void> {
+        return new Promise((resolve, reject) => {
+            ffmpeg(videoPath)
+                .outputOptions([
+                    `-ss ${startTime}`,
+                    `-t ${duration}`,
+                    '-vn',
+                    '-acodec libmp3lame'
+                ])
+                .on('start', (cmd) => {
+                    console.log('FFmpeg CMD:', cmd);
+                })
+                .on('end', resolve)
+                .on('error', reject)
+                .save(outputAudioPath);
+        });
+    }
 
 
 
@@ -1107,52 +1107,52 @@ export class VideoService {
                     audio = await this.audioRepository.findOne({
                         where: { uuid: music.id },
                     });
-                    if(!audio) {
+                    if (!audio) {
                         throw new BadRequestException('Audio not found');
                     }
                 }
             }
-                else {
-                    // 🟡 CASE 3: Extract audio from video (fallback)
-                    console.log('🎧 Extracting audio from video');
+            else {
+                // 🟡 CASE 3: Extract audio from video (fallback)
+                console.log('🎧 Extracting audio from video');
 
-                    const audioFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.mp3`;
-                    const audioPath = path.join(
-                        process.cwd(),
-                        'src/uploads/audios',
-                        audioFilename,
-                    );
+                const audioFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.mp3`;
+                const audioPath = path.join(
+                    process.cwd(),
+                    'src/uploads/audios',
+                    audioFilename,
+                );
 
-                    const audioFolder = path.dirname(audioPath);
-                    if (!fs.existsSync(audioFolder)) {
-                        fs.mkdirSync(audioFolder, { recursive: true });
-                    }
+                const audioFolder = path.dirname(audioPath);
+                if (!fs.existsSync(audioFolder)) {
+                    fs.mkdirSync(audioFolder, { recursive: true });
+                }
 
-                    const hasAudio = await this.checkIfVideoHasAudio(videoPath);
-                    if (hasAudio) {
-                        try {
-                            await this.extractAudioFromVideo(videoPath, audioPath,createVideoDto.trimStart, createVideoDto.trimEnd);
+                const hasAudio = await this.checkIfVideoHasAudio(videoPath);
+                if (hasAudio) {
+                    try {
+                        await this.extractAudioFromVideo(videoPath, audioPath, createVideoDto.trimStart, createVideoDto.trimEnd);
 
-                            const uploadedAudio = await this.uploadService.uploadFile(
-                                audioPath,
-                                'audios',
-                            );
-                            audio = this.audioRepository.create({
-                                uuid: uuidv4(),
-                                name: createVideoDto.title || 'Audio',
-                                src: uploadedAudio.publicUrl,
-                                category: 'auto-extracted',
-                                author: data.userId,
-                            });
+                        const uploadedAudio = await this.uploadService.uploadFile(
+                            audioPath,
+                            'audios',
+                        );
+                        audio = this.audioRepository.create({
+                            uuid: uuidv4(),
+                            name: createVideoDto.title || 'Audio',
+                            src: uploadedAudio.publicUrl,
+                            category: 'auto-extracted',
+                            author: data.userId,
+                        });
 
-                            await this.audioRepository.save(audio);
-                        } finally {
-                            if (fs.existsSync(audioPath)) {
-                                fs.unlinkSync(audioPath);
-                            }
+                        await this.audioRepository.save(audio);
+                    } finally {
+                        if (fs.existsSync(audioPath)) {
+                            fs.unlinkSync(audioPath);
                         }
                     }
                 }
+            }
 
 
             /* =======================
@@ -1602,112 +1602,112 @@ export class VideoService {
 
 
     async getVideosFeed(
-    userId: string,
-    feedType: 'followings' | 'news' | 'explore',
-    page = 1,
-    limit = 10,
-    random = false
-) {
-    const skip = (page - 1) * limit;
+        userId: string,
+        feedType: 'followings' | 'news' | 'explore',
+        page = 1,
+        limit = 10,
+        random = false
+    ) {
+        const skip = (page - 1) * limit;
 
-    // Base query
-    const baseQuery = this.videoRepository
-        .createQueryBuilder('video')
-        .leftJoinAndSelect('video.user_id', 'user')
-        .leftJoinAndSelect('user.userProfile', 'userProfile')
-        .leftJoinAndSelect('video.audio', 'audio')
-        .leftJoinAndSelect('video.hashtags', 'hashtags')
-        .leftJoinAndSelect('video.likes', 'likes')
-        .leftJoinAndSelect('likes.user', 'likeUser')
-        .leftJoinAndSelect('video.comments', 'comments')
-        .leftJoinAndSelect('video.views', 'views')
-        .leftJoinAndSelect('video.shares','shares')
-        .where('video.type != :storyType', { storyType: 'story' });
+        // Base query
+        const baseQuery = this.videoRepository
+            .createQueryBuilder('video')
+            .leftJoinAndSelect('video.user_id', 'user')
+            .leftJoinAndSelect('user.userProfile', 'userProfile')
+            .leftJoinAndSelect('video.audio', 'audio')
+            .leftJoinAndSelect('video.hashtags', 'hashtags')
+            .leftJoinAndSelect('video.likes', 'likes')
+            .leftJoinAndSelect('likes.user', 'likeUser')
+            .leftJoinAndSelect('video.comments', 'comments')
+            .leftJoinAndSelect('video.views', 'views')
+            .leftJoinAndSelect('video.shares', 'shares')
+            .where('video.type != :storyType', { storyType: 'story' });
 
-    /* ================= FEED TYPE LOGIC ================= */
-    if (feedType === 'followings') {
-        const followings = await this.followRepository.find({
-            where: { follower: { id: userId } },
-            relations: ['following'],
-        });
-        const followingIds = followings.map(f => f.following.id);
+        /* ================= FEED TYPE LOGIC ================= */
+        if (feedType === 'followings') {
+            const followings = await this.followRepository.find({
+                where: { follower: { id: userId } },
+                relations: ['following'],
+            });
+            const followingIds = followings.map(f => f.following.id);
 
-        if (!followingIds.length) {
-            return { data: [], page, limit, total: 0, totalPages: 0, random };
+            if (!followingIds.length) {
+                return { data: [], page, limit, total: 0, totalPages: 0, random };
+            }
+
+            baseQuery.andWhere('video.user_id IN (:...followingIds)', { followingIds });
+
+        } else if (feedType === 'news') {
+            baseQuery.andWhere('video.type = :newsType', { newsType: 'news' });
+
+        } else if (feedType === 'explore') {
+            baseQuery.andWhere(
+                '(video.type = :reelsType OR video.type = :newsType)',
+                { reelsType: 'reels', newsType: 'news' }
+            );
         }
 
-        baseQuery.andWhere('video.user_id IN (:...followingIds)', { followingIds });
+        /* ================= RANDOM LOGIC ================= */
+        let videos: any[] = [];
+        let total = 0;
 
-    } else if (feedType === 'news') {
-        baseQuery.andWhere('video.type = :newsType', { newsType: 'news' });
+        if (random) {
+            total = await baseQuery.getCount();
+            if (total === 0) return { data: [], page, limit, total: 0, totalPages: 0, random };
 
-    } else if (feedType === 'explore') {
-        baseQuery.andWhere(
-            '(video.type = :reelsType OR video.type = :newsType)',
-            { reelsType: 'reels', newsType: 'news' }
-        );
+            // Generate random offsets
+            const randomOffsets = new Set<number>();
+            while (randomOffsets.size < Math.min(limit, total)) {
+                randomOffsets.add(Math.floor(Math.random() * total));
+            }
+
+            // Fetch videos at random offsets
+            for (const offset of randomOffsets) {
+                const [video] = await baseQuery.skip(offset).take(1).getMany();
+                if (video) videos.push(video);
+            }
+
+        } else {
+            // Normal pagination
+            baseQuery.orderBy('video.created_at', 'DESC');
+            baseQuery.skip(skip).take(limit);
+            [videos, total] = await baseQuery.getManyAndCount();
+        }
+
+        /* ================= RESPONSE FORMAT ================= */
+        const formatted = videos.map(v => ({
+            id: v.uuid,
+            title: v.title,
+            caption: v.caption,
+            videoUrl: v.videoUrl,
+            type: v.type,
+            created_at: v.created_at,
+            thumbnailUrl: v.thumbnailUrl,
+            duration: v.duration || 15,
+            user: {
+                id: v.user_id.id,
+                username: v.user_id.username,
+                profilePic: v.user_id.userProfile?.ProfilePicture || '',
+            },
+            audio: v.audio ? { id: v.audio.uuid, title: v.audio.name } : null,
+            hashtags: v.hashtags?.map(h => h.tag) || [],
+            likesCount: v.likes?.length || 0,
+            viewsCount: v.views?.length || 0,
+            commentsCount: v.comments?.length || 0,
+            shareCount: v.shares?.length || 0,
+            isLiked: v.likes?.some(like => like.user?.id === userId) || false
+        }));
+
+        return {
+            data: formatted,
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+            random
+        };
     }
-
-    /* ================= RANDOM LOGIC ================= */
-    let videos: any[] = [];
-    let total = 0;
-
-    if (random) {
-        total = await baseQuery.getCount();
-        if (total === 0) return { data: [], page, limit, total: 0, totalPages: 0, random };
-
-        // Generate random offsets
-        const randomOffsets = new Set<number>();
-        while (randomOffsets.size < Math.min(limit, total)) {
-            randomOffsets.add(Math.floor(Math.random() * total));
-        }
-
-        // Fetch videos at random offsets
-        for (const offset of randomOffsets) {
-            const [video] = await baseQuery.skip(offset).take(1).getMany();
-            if (video) videos.push(video);
-        }
-
-    } else {
-        // Normal pagination
-        baseQuery.orderBy('video.created_at', 'DESC');
-        baseQuery.skip(skip).take(limit);
-        [videos, total] = await baseQuery.getManyAndCount();
-    }
-
-    /* ================= RESPONSE FORMAT ================= */
-    const formatted = videos.map(v => ({
-        id: v.uuid,
-        title: v.title,
-        caption: v.caption,
-        videoUrl: v.videoUrl,
-        type: v.type,
-        created_at: v.created_at,
-        thumbnailUrl: v.thumbnailUrl,
-        duration: v.duration || 15,
-        user: {
-            id: v.user_id.id,
-            username: v.user_id.username,
-            profilePic: v.user_id.userProfile?.ProfilePicture || '',
-        },
-        audio: v.audio ? { id: v.audio.uuid, title: v.audio.name } : null,
-        hashtags: v.hashtags?.map(h => h.tag) || [],
-        likesCount: v.likes?.length || 0,
-        viewsCount: v.views?.length || 0,
-        commentsCount: v.comments?.length || 0,
-        shareCount: v.shares?.length || 0,
-        isLiked: v.likes?.some(like => like.user?.id === userId) || false
-    }));
-
-    return {
-        data: formatted,
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        random
-    };
-}
 
 
     async getExploreVideosWithMain(
@@ -1725,7 +1725,7 @@ export class VideoService {
             .leftJoinAndSelect('video.views', 'views')
             .leftJoinAndSelect('likes.user', 'likeUser')
             .leftJoinAndSelect('video.comments', 'comments')
-            .leftJoinAndSelect('video.shares','shares')
+            .leftJoinAndSelect('video.shares', 'shares')
             .where('video.uuid = :videoId', { videoId })
             .andWhere('video.type IN (:...types)', { types: ['reels', 'news'] })
             .getOne();
@@ -1745,7 +1745,7 @@ export class VideoService {
             .leftJoinAndSelect('video.views', 'views')
             .leftJoinAndSelect('likes.user', 'likeUser')
             .leftJoinAndSelect('video.comments', 'comments')
-            .leftJoinAndSelect('video.shares','shares')
+            .leftJoinAndSelect('video.shares', 'shares')
             .where('video.type IN (:...types)', { types: ['reels', 'news'] })
             .andWhere('video.uuid != :videoId', { videoId })
             .orderBy('RANDOM()')
@@ -1790,6 +1790,22 @@ export class VideoService {
 
         await this.videoRepository.remove(video);
         return { success: true };
+    }
+
+    async getAutoExtractedAudios() {
+        const take = 10;
+
+        const total = await this.audioRepository.count();
+        if (total === 0) return [];
+
+        const maxSkip = Math.max(0, total - take);
+        const randomSkip = Math.floor(Math.random() * (maxSkip + 1));
+
+        return await this.audioRepository
+            .createQueryBuilder('audio')
+            .offset(randomSkip)
+            .limit(take)
+            .getMany();
     }
 }
 

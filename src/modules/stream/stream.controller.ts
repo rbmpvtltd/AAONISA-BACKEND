@@ -157,4 +157,9 @@ export class VideoController {
   remove(@Param('id') id: string) {
     return this.videoService.deleteVideoById(id);
   }
+
+  @Get('/getAudios')
+  getAudios() {
+    return this.videoService.getAutoExtractedAudios();
+  }
 }
