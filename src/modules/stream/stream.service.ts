@@ -1555,6 +1555,7 @@ export class VideoService {
             .leftJoinAndSelect('video.likes', 'likes')
             .leftJoinAndSelect('video.comments', 'comments')
             .leftJoinAndSelect('video.views', 'views')
+            .leftJoinAndSelect('video.shares', 'shares')
             .leftJoinAndSelect('likes.user', 'likeUser')
             .where('video.type != :storyType', { storyType: 'story' })
             .andWhere('user.role = :role', { role: UserRole.ADMIN })
@@ -1585,6 +1586,7 @@ export class VideoService {
             likesCount: v.likes?.length || 0,
             viewsCount: v.views?.length || 0,
             commentsCount: v.comments?.length || 0,
+            sharesCount: v.shares?.length || 0,
             isLiked: v.likes?.some(like => like.user?.id === v.user_id.id) || false
 
         }));
