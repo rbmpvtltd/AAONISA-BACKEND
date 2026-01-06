@@ -235,12 +235,12 @@ export class UserService {
 
   async register(dto: RegisterDto, res: Response) {
     try {
-      const isEmail = await this.checkUserAvailability(
+      const check = await this.checkUserAvailability(
         dto.emailOrPhone,
         dto.username,
       );
 
-      if (!isEmail.success) {
+      if (!check.success) {
         return res.status(400).json({
           statusCode: 400,
           message: 'Email or phone number already in use',
@@ -249,8 +249,8 @@ export class UserService {
       }
 
       const isValidOtp = await this.otpService.validateOtp({
-        email: isEmail ? dto.emailOrPhone : undefined,
-        phone_no: !isEmail ? dto.emailOrPhone : undefined,
+        email: check.isEmail ? dto.emailOrPhone : undefined,
+        phone_no: !check.isEmail ? dto.emailOrPhone : undefined,
         code: dto.otp,
       });
 
@@ -266,8 +266,8 @@ export class UserService {
 
       const user = this.userRepository.create({
         username: dto.username,
-        email: isEmail ? dto.emailOrPhone : undefined,
-        phone_no: !isEmail ? dto.emailOrPhone : undefined,
+        email: check.isEmail ? dto.emailOrPhone : undefined,
+        phone_no: !check.isEmail ? dto.emailOrPhone : undefined,
         password: hashedPassword,
       });
 
