@@ -30,7 +30,7 @@ export class ChatController {
 
 
 
-  
+
   // Delete a chat session
   @Delete('sessions/:id')
   deleteSession(@Param('id') sessionId: number, @Req() req) {
@@ -58,45 +58,45 @@ export class ChatController {
     return this.chatService.getSessionMessages(sessionId, limit);
   }
 
-  
-@Delete('message/:messageId/for-me')
-@HttpCode(HttpStatus.OK)
-async deleteMessageForMe(
-  @Param('messageId') messageId: string,
-  @Req() req: any,
-) {
-  const userId = req.user.id;
-  
-  // ✅ Validate messageId is a number
-  if (isNaN(parseInt(messageId))) {
-    throw new BadRequestException('Invalid message ID format');
-  }
-  
-  return this.chatService.deleteMessageForMe(userId, messageId);
-}
 
-@Delete('message/:messageId/for-everyone')
-@HttpCode(HttpStatus.OK)
-async deleteMessageForEveryone(
-  @Param('messageId') messageId: string,
-  @Req() req: any,
-) {
-  const userId = req.user.id;
-  
-  // ✅ Validate messageId is a number
-  if (isNaN(parseInt(messageId))) {
-    throw new BadRequestException('Invalid message ID format');
-  }
-  
-  return this.chatService.deleteMessageForEveryone(userId, messageId);
-}
+  @Delete('message/:messageId/for-me')
+  @HttpCode(HttpStatus.OK)
+  async deleteMessageForMe(
+    @Param('messageId') messageId: string,
+    @Req() req: any,
+  ) {
+    const userId = req.user.id;
 
-@Post('shareReelMultiple')
-async shareReelMultiple(@Req() req, @Body() {reelId,sessionIds}:{reelId:string,sessionIds:number[]}) {
-  const payload = req.user;
-  const senderId = payload?.sub || payload?.id || payload?.userId;
-  return this.chatService.shareReelMultiple(senderId, reelId,sessionIds);
-}
+    // ✅ Validate messageId is a number
+    if (isNaN(parseInt(messageId))) {
+      throw new BadRequestException('Invalid message ID format');
+    }
+
+    return this.chatService.deleteMessageForMe(userId, messageId);
+  }
+
+  @Delete('message/:messageId/for-everyone')
+  @HttpCode(HttpStatus.OK)
+  async deleteMessageForEveryone(
+    @Param('messageId') messageId: string,
+    @Req() req: any,
+  ) {
+    const userId = req.user.id;
+
+    // ✅ Validate messageId is a number
+    if (isNaN(parseInt(messageId))) {
+      throw new BadRequestException('Invalid message ID format');
+    }
+
+    return this.chatService.deleteMessageForEveryone(userId, messageId);
+  }
+
+  @Post('shareReelMultiple')
+  async shareReelMultiple(@Req() req, @Body() { reelId, sessionIds }: { reelId: string, sessionIds: number[] }) {
+    const payload = req.user;
+    const senderId = payload?.sub || payload?.id || payload?.userId;
+    return this.chatService.shareReelMultiple(senderId, reelId, sessionIds);
+  }
   // // Delete a message
   // @Delete('messages/:id')
   // deleteMessage(@Param('id') messageId: number, @Req() req) {
