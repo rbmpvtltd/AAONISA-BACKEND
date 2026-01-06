@@ -86,48 +86,48 @@ export class ChatService {
     // }
 
     async getUserSessionsWithLatestMessage(userId: string) {
-    const sessions = await this.chatSessionRepo.find({
-        where: [
-            { user1: { id: userId } },
-            { user2: { id: userId } },
-        ],
-        relations: ['user1', 'user1.userProfile', 'user2', 'user2.userProfile', 'messages', 'messages.sender', 'messages.sender.userProfile'],
-        order: { created_at: 'DESC' },
-    });
-
-    return sessions
-        .filter(session => session.user1 && session.user2)
-        .map(session => {
-            // Determine the "other" user
-            const otherUser = session.user1.id === userId ? session.user2 : session.user1;
-            
-            const latestMessage = session.messages?.sort(
-                (a, b) => b.created_at.getTime() - a.created_at.getTime()
-            )[0];
-
-            return {
-                sessionId: session.session_id,
-                otherUser: { 
-                    id: otherUser.id, 
-                    username: otherUser.username,
-                    profilePicture: otherUser.userProfile?.ProfilePicture || ''
-                },
-                createdAt: session.created_at,
-                latestMessage: latestMessage && latestMessage.sender
-                    ? {
-                        chatId: latestMessage.chat_id,
-                        sender: {
-                            id: latestMessage.sender.id,
-                            username: latestMessage.sender.username,
-                            profilePicture: latestMessage.sender.userProfile?.ProfilePicture || ''
-                        },
-                        text: latestMessage.message_text,
-                        createdAt: latestMessage.created_at,
-                    }
-                    : null,
-            };
+        const sessions = await this.chatSessionRepo.find({
+            where: [
+                { user1: { id: userId } },
+                { user2: { id: userId } },
+            ],
+            relations: ['user1', 'user1.userProfile', 'user2', 'user2.userProfile', 'messages', 'messages.sender', 'messages.sender.userProfile'],
+            order: { created_at: 'DESC' },
         });
-}
+
+        return sessions
+            .filter(session => session.user1 && session.user2)
+            .map(session => {
+                // Determine the "other" user
+                const otherUser = session.user1.id === userId ? session.user2 : session.user1;
+
+                const latestMessage = session.messages?.sort(
+                    (a, b) => b.created_at.getTime() - a.created_at.getTime()
+                )[0];
+
+                return {
+                    sessionId: session.session_id,
+                    otherUser: {
+                        id: otherUser.id,
+                        username: otherUser.username,
+                        profilePicture: otherUser.userProfile?.ProfilePicture || ''
+                    },
+                    createdAt: session.created_at,
+                    latestMessage: latestMessage && latestMessage.sender
+                        ? {
+                            chatId: latestMessage.chat_id,
+                            sender: {
+                                id: latestMessage.sender.id,
+                                username: latestMessage.sender.username,
+                                profilePicture: latestMessage.sender.userProfile?.ProfilePicture || ''
+                            },
+                            text: latestMessage.message_text,
+                            createdAt: latestMessage.created_at,
+                        }
+                        : null,
+                };
+            });
+    }
 
     async deleteSession(userId: string, sessionId: number) {
         const session = await this.chatSessionRepo.findOne({
@@ -139,7 +139,7 @@ export class ChatService {
 
         if (session.user1.id !== userId && session.user2.id !== userId) {
             throw new ForbiddenException('Not authorized to delete this session');
-        }   
+        }
 
         return this.chatSessionRepo.remove(session);
     }
@@ -244,7 +244,7 @@ export class ChatService {
 
         return { success: true, messageId: id };
     }
-     async findSessionByUsers(userId1: string, userId2: string) {
+    async findSessionByUsers(userId1: string, userId2: string) {
         return this.chatSessionRepo.findOne({
             where: [
                 { user1: { id: userId1 }, user2: { id: userId2 } },
@@ -253,114 +253,114 @@ export class ChatService {
             relations: ['user1', 'user2'],
         });
     }
-     
-//     async shareReelMultiple(senderId: string, reelId: string, sessionIds: number[]) {
-//     if (!sessionIds?.length) {
-//         throw new BadRequestException("sessionIds array is required");
-//     }
-//     const reel = await this.videoRepo.findOneBy({ uuid: reelId });
-//     if (!reel) {
-//         throw new NotFoundException("Reel not found");
-//     }
-//     // 1. Get Reel data (replace with your own reel table logic)
-//     const reelURL = reel.videoUrl;
-//     const thumbURL = reel.thumbnailUrl;
 
-//     // 2. Fixed format message
-//     const messagePayload = {
-//         type: "reel",
-//         reelId,
-//         url: reelURL,
-//         thumbnail: thumbURL
-//     };
-//     for (const sessionId of sessionIds) {
-//         // 3. Validate session
-//         const session = await this.chatSessionRepo.findOne({
-//             where: { session_id: sessionId },
-//         });
+    //     async shareReelMultiple(senderId: string, reelId: string, sessionIds: number[]) {
+    //     if (!sessionIds?.length) {
+    //         throw new BadRequestException("sessionIds array is required");
+    //     }
+    //     const reel = await this.videoRepo.findOneBy({ uuid: reelId });
+    //     if (!reel) {
+    //         throw new NotFoundException("Reel not found");
+    //     }
+    //     // 1. Get Reel data (replace with your own reel table logic)
+    //     const reelURL = reel.videoUrl;
+    //     const thumbURL = reel.thumbnailUrl;
 
-//         if (!session) continue; // Skip invalid sessions
+    //     // 2. Fixed format message
+    //     const messagePayload = {
+    //         type: "reel",
+    //         reelId,
+    //         url: reelURL,
+    //         thumbnail: thumbURL
+    //     };
+    //     for (const sessionId of sessionIds) {
+    //         // 3. Validate session
+    //         const session = await this.chatSessionRepo.findOne({
+    //             where: { session_id: sessionId },
+    //         });
 
-//         // 4. Validate sender
-//         const sender = await this.userRepo.findOneBy({ id: senderId });
-//         if (!sender) throw new NotFoundException("Sender not found");
+    //         if (!session) continue; // Skip invalid sessions
 
-//         // 5. Create message
-//         const chat = this.chatRepo.create({
-//             session,
-//             sender,
-//             message_text: JSON.stringify(messagePayload), // <-- IMPORTANT
-//         });
-//         await this.chatRepo.save(chat);
-//     }
+    //         // 4. Validate sender
+    //         const sender = await this.userRepo.findOneBy({ id: senderId });
+    //         if (!sender) throw new NotFoundException("Sender not found");
 
-//     return {
-//         success: true,
-//     };
-// }
-async shareReelMultiple(
-  senderId: string,
-  reelId: string,
-  sessionIds: number[],
-) {
-  if (!sessionIds?.length) {
-    throw new BadRequestException("sessionIds array is required");
-  }
+    //         // 5. Create message
+    //         const chat = this.chatRepo.create({
+    //             session,
+    //             sender,
+    //             message_text: JSON.stringify(messagePayload), // <-- IMPORTANT
+    //         });
+    //         await this.chatRepo.save(chat);
+    //     }
 
-  const reel = await this.videoRepo.findOneBy({ uuid: reelId });
-  if (!reel) {
-    throw new NotFoundException("Reel not found");
-  }
+    //     return {
+    //         success: true,
+    //     };
+    // }
+    async shareReelMultiple(
+        senderId: string,
+        reelId: string,
+        sessionIds: number[],
+    ) {
+        if (!sessionIds?.length) {
+            throw new BadRequestException("sessionIds array is required");
+        }
 
-  const sender = await this.userRepo.findOneBy({ id: senderId });
-  if (!sender) {
-    throw new NotFoundException("Sender not found");
-  }
+        const reel = await this.videoRepo.findOneBy({ uuid: reelId });
+        if (!reel) {
+            throw new NotFoundException("Reel not found");
+        }
 
-  const messagePayload = {
-    type: "reel",
-    reelId,
-    url: reel.videoUrl,
-    thumbnail: reel.thumbnailUrl,
-  };
+        const sender = await this.userRepo.findOneBy({ id: senderId });
+        if (!sender) {
+            throw new NotFoundException("Sender not found");
+        }
 
-  for (const sessionId of sessionIds) {
-    const session = await this.chatSessionRepo.findOne({
-      where: { session_id: sessionId },
-      relations: ["user1", "user2"], // IMPORTANT
-    });
+        const messagePayload = {
+            type: "reel",
+            reelId,
+            url: reel.videoUrl,
+            thumbnail: reel.thumbnailUrl,
+        };
 
-    if (!session) continue;
+        for (const sessionId of sessionIds) {
+            const session = await this.chatSessionRepo.findOne({
+                where: { session_id: sessionId },
+                relations: ["user1", "user2"], // IMPORTANT
+            });
 
-    // 🔑 Receiver identify
-    const receiver =
-      session.user1.id === senderId ? session.user2 : session.user1;
+            if (!session) continue;
 
-    if (!receiver) continue;
+            // 🔑 Receiver identify
+            const receiver =
+                session.user1.id === senderId ? session.user2 : session.user1;
 
-    // 📨 Chat message save
-    const chat = this.chatRepo.create({
-      session,
-      sender,
-      message_text: JSON.stringify(messagePayload),
-    });
-    await this.chatRepo.save(chat);
+            if (!receiver) continue;
 
-    // 📊 Share table entry
-    const share = this.shareRepo.create({
-      reel_id: reelId,
-      shared_by_user_id: senderId,
-      shared_to_user_id: receiver.id,
-    });
+            // 📨 Chat message save
+            const chat = this.chatRepo.create({
+                session,
+                sender,
+                message_text: JSON.stringify(messagePayload),
+            });
+            await this.chatRepo.save(chat);
 
-    await this.shareRepo.save(share);
-  }
+            // 📊 Share table entry
+            const share = this.shareRepo.create({
+                reel_id: reelId,
+                shared_by_user_id: senderId,
+                shared_to_user_id: receiver.id,
+            });
 
-  return {
-    success: true,
-    message: "Reel shared successfully",
-  };
-}
+            await this.shareRepo.save(share);
+        }
+
+        return {
+            success: true,
+            message: "Reel shared successfully",
+        };
+    }
 
 
 }

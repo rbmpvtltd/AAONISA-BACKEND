@@ -6,6 +6,7 @@ import { Like, Repository } from 'typeorm';
 import { Response } from 'express';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import * as sharp from 'sharp';
 
 import { UserProfile } from './entities/user-profile.entity';
 import { User, UserRole } from './entities/user.entity';
@@ -42,45 +43,45 @@ export class UserService {
     private readonly tokenService: TokenService
   ) { }
 
-private async checkUserAvailability(
-  emailOrPhone: string,
-  username: string,
-) {
-  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailOrPhone);
+  private async checkUserAvailability(
+    emailOrPhone: string,
+    username: string,
+  ) {
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailOrPhone);
 
-  // Check email or phone separately
-  if (isEmail) {
-    const existingEmail = await this.userRepository.findOne({ where: { email: emailOrPhone } });
-    if (existingEmail) {
+    // Check email or phone separately
+    if (isEmail) {
+      const existingEmail = await this.userRepository.findOne({ where: { email: emailOrPhone } });
+      if (existingEmail) {
+        return {
+          success: false,
+          field: 'email',
+          message: 'Email already in use',
+        };
+      }
+    } else {
+      const existingPhone = await this.userRepository.findOne({ where: { phone_no: emailOrPhone } });
+      if (existingPhone) {
+        return {
+          success: false,
+          field: 'phone',
+          message: 'Phone number already in use',
+        };
+      }
+    }
+
+    // Check username separately
+    const existingUsername = await this.userRepository.findOne({ where: { username } });
+    if (existingUsername) {
       return {
         success: false,
-        field: 'email',
-        message: 'Email already in use',
+        field: 'username',
+        message: 'Username already in use',
       };
     }
-  } else {
-    const existingPhone = await this.userRepository.findOne({ where: { phone_no: emailOrPhone } });
-    if (existingPhone) {
-      return {
-        success: false,
-        field: 'phone',
-        message: 'Phone number already in use',
-      };
-    }
-  }
 
-  // Check username separately
-  const existingUsername = await this.userRepository.findOne({ where: { username } });
-  if (existingUsername) {
-    return {
-      success: false,
-      field: 'username',
-      message: 'Username already in use',
-    };
+    return { success: true, isEmail };
   }
-
-  return { success: true, isEmail };
-}
 
   // async preRegisterCheck(dto: { emailOrPhone: string; username: string }) {
   //   const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
@@ -110,201 +111,201 @@ private async checkUserAvailability(
   //   return { message: 'OTP sent for verification', success: true };
   // }
   async preRegisterCheck(dto: { emailOrPhone: string; username: string }) {
-  const check = await this.checkUserAvailability(dto.emailOrPhone, dto.username);
+    const check = await this.checkUserAvailability(dto.emailOrPhone, dto.username);
     console.log('check', check)
-  if (!check.success) {
-    return {
-      statusCode: 400,
-      message: check.message,
-      success: false,
-      field: check.field,
-    };
-  }
-
-  const otp = await this.otpService.generateOtp({
-    email: check.isEmail ? dto.emailOrPhone : undefined,
-    phone_no: !check.isEmail ? dto.emailOrPhone : undefined,
-  });
-
-  if (check.isEmail) {
-    await this.emailService.sendOtp(dto.emailOrPhone, otp);
-  } else {
-    await this.smsService.sendOtpSms(dto.emailOrPhone, otp);
-  }
-
-  return { message: 'OTP sent for verification', success: true };
-}
-
-
-//   async register(dto: RegisterDto, res: Response) {
-//   try {
-//     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
-
-//     const isValidOtp = await this.otpService.validateOtp({
-//       email: isEmail ? dto.emailOrPhone : undefined,
-//       phone_no: !isEmail ? dto.emailOrPhone : undefined,
-//       code: dto.otp,
-//     });
-
-//     if (!isValidOtp) {
-//       return res.status(400).json({ 
-//         statusCode: 400, 
-//         message: 'Invalid or expired OTP', 
-//         success: false 
-//       });
-//     }
-
-//     // Email / Phone check
-//     if (isEmail) {
-//       const existingEmail = await this.userRepository.findOne({ where: { email: dto.emailOrPhone } });
-//       if (existingEmail) {
-//         return res.status(400).json({
-//           statusCode: 400,
-//           message: 'Email already in use',
-//           success: false,
-//         });
-//       }
-//     } else {
-//       const existingPhone = await this.userRepository.findOne({ where: { phone_no: dto.emailOrPhone } });
-//       if (existingPhone) {
-//         return res.status(400).json({
-//           statusCode: 400,
-//           message: 'Phone number already in use',
-//           success: false,
-//         });
-//       }
-//     }
-
-//     // Username check
-//     const existingUsername = await this.userRepository.findOne({ where: { username: dto.username } });
-//     if (existingUsername) {
-//       return res.status(400).json({
-//         statusCode: 400,
-//         message: 'Username already in use',
-//         success: false,
-//       });
-//     }
-
-//     // Hash password
-//     const hashedPassword = await bcrypt.hash(dto.password, 10);
-
-//     // Create user
-//     const user = this.userRepository.create({
-//       username: dto.username,
-//       email: isEmail ? dto.emailOrPhone : undefined,
-//       phone_no: !isEmail ? dto.emailOrPhone : undefined,
-//       password: hashedPassword,
-//     });
-//     const savedUser = await this.userRepository.save(user);
-
-//     // Create profile
-//     const userProfile = this.userProfileRepository.create({
-//       user_id: savedUser.id,
-//       name: savedUser.username,
-//       role: dto.role,
-//       paid: false,
-//       star: 1,
-//     });
-//     await this.userProfileRepository.save(userProfile);
-
-//     // Generate tokens
-//     const tokens = this.authService.generateTokens({ sub: savedUser.id });
-//     savedUser.refreshToken = await bcrypt.hash(tokens.refreshToken, 10);
-//     await this.userRepository.save(savedUser);
-
-//     // Set cookies
-//     res.cookie('accessToken', tokens.accessToken, {
-//       httpOnly: true, secure: true, sameSite: 'strict', maxAge: 15 * 60 * 1000,
-//     });
-//     res.cookie('refreshToken', tokens.refreshToken, {
-//       httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000,
-//     });
-
-//     return res.status(201).json({ message: 'User registered successfully', success: true });
-    
-//   } catch (err) {
-//     console.error(err);
-//     return res.status(500).json({
-//       statusCode: 500,
-//       message: 'Internal server error',
-//       success: false,
-//     });
-//   }
-// }
-
-async register(dto: RegisterDto, res: Response) {
-  try {
-    const isEmail = await this.checkUserAvailability(
-      dto.emailOrPhone,
-      dto.username,
-    );
-    
-    if (!isEmail.success) {
-      return res.status(400).json({
+    if (!check.success) {
+      return {
         statusCode: 400,
-        message: 'Email or phone number already in use',
+        message: check.message,
+        success: false,
+        field: check.field,
+      };
+    }
+
+    const otp = await this.otpService.generateOtp({
+      email: check.isEmail ? dto.emailOrPhone : undefined,
+      phone_no: !check.isEmail ? dto.emailOrPhone : undefined,
+    });
+
+    if (check.isEmail) {
+      await this.emailService.sendOtp(dto.emailOrPhone, otp);
+    } else {
+      await this.smsService.sendOtpSms(dto.emailOrPhone, otp);
+    }
+
+    return { message: 'OTP sent for verification', success: true };
+  }
+
+
+  //   async register(dto: RegisterDto, res: Response) {
+  //   try {
+  //     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dto.emailOrPhone);
+
+  //     const isValidOtp = await this.otpService.validateOtp({
+  //       email: isEmail ? dto.emailOrPhone : undefined,
+  //       phone_no: !isEmail ? dto.emailOrPhone : undefined,
+  //       code: dto.otp,
+  //     });
+
+  //     if (!isValidOtp) {
+  //       return res.status(400).json({ 
+  //         statusCode: 400, 
+  //         message: 'Invalid or expired OTP', 
+  //         success: false 
+  //       });
+  //     }
+
+  //     // Email / Phone check
+  //     if (isEmail) {
+  //       const existingEmail = await this.userRepository.findOne({ where: { email: dto.emailOrPhone } });
+  //       if (existingEmail) {
+  //         return res.status(400).json({
+  //           statusCode: 400,
+  //           message: 'Email already in use',
+  //           success: false,
+  //         });
+  //       }
+  //     } else {
+  //       const existingPhone = await this.userRepository.findOne({ where: { phone_no: dto.emailOrPhone } });
+  //       if (existingPhone) {
+  //         return res.status(400).json({
+  //           statusCode: 400,
+  //           message: 'Phone number already in use',
+  //           success: false,
+  //         });
+  //       }
+  //     }
+
+  //     // Username check
+  //     const existingUsername = await this.userRepository.findOne({ where: { username: dto.username } });
+  //     if (existingUsername) {
+  //       return res.status(400).json({
+  //         statusCode: 400,
+  //         message: 'Username already in use',
+  //         success: false,
+  //       });
+  //     }
+
+  //     // Hash password
+  //     const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+  //     // Create user
+  //     const user = this.userRepository.create({
+  //       username: dto.username,
+  //       email: isEmail ? dto.emailOrPhone : undefined,
+  //       phone_no: !isEmail ? dto.emailOrPhone : undefined,
+  //       password: hashedPassword,
+  //     });
+  //     const savedUser = await this.userRepository.save(user);
+
+  //     // Create profile
+  //     const userProfile = this.userProfileRepository.create({
+  //       user_id: savedUser.id,
+  //       name: savedUser.username,
+  //       role: dto.role,
+  //       paid: false,
+  //       star: 1,
+  //     });
+  //     await this.userProfileRepository.save(userProfile);
+
+  //     // Generate tokens
+  //     const tokens = this.authService.generateTokens({ sub: savedUser.id });
+  //     savedUser.refreshToken = await bcrypt.hash(tokens.refreshToken, 10);
+  //     await this.userRepository.save(savedUser);
+
+  //     // Set cookies
+  //     res.cookie('accessToken', tokens.accessToken, {
+  //       httpOnly: true, secure: true, sameSite: 'strict', maxAge: 15 * 60 * 1000,
+  //     });
+  //     res.cookie('refreshToken', tokens.refreshToken, {
+  //       httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000,
+  //     });
+
+  //     return res.status(201).json({ message: 'User registered successfully', success: true });
+
+  //   } catch (err) {
+  //     console.error(err);
+  //     return res.status(500).json({
+  //       statusCode: 500,
+  //       message: 'Internal server error',
+  //       success: false,
+  //     });
+  //   }
+  // }
+
+  async register(dto: RegisterDto, res: Response) {
+    try {
+      const isEmail = await this.checkUserAvailability(
+        dto.emailOrPhone,
+        dto.username,
+      );
+
+      if (!isEmail.success) {
+        return res.status(400).json({
+          statusCode: 400,
+          message: 'Email or phone number already in use',
+          success: false,
+        });
+      }
+
+      const isValidOtp = await this.otpService.validateOtp({
+        email: isEmail ? dto.emailOrPhone : undefined,
+        phone_no: !isEmail ? dto.emailOrPhone : undefined,
+        code: dto.otp,
+      });
+
+      if (!isValidOtp) {
+        return res.status(400).json({
+          statusCode: 400,
+          message: 'Invalid or expired OTP',
+          success: false,
+        });
+      }
+
+      const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+      const user = this.userRepository.create({
+        username: dto.username,
+        email: isEmail ? dto.emailOrPhone : undefined,
+        phone_no: !isEmail ? dto.emailOrPhone : undefined,
+        password: hashedPassword,
+      });
+
+      const savedUser = await this.userRepository.save(user);
+
+      // Create profile
+      const userProfile = this.userProfileRepository.create({
+        user_id: savedUser.id,
+        name: savedUser.username,
+        role: dto.role,
+        paid: false,
+        star: 1,
+      });
+      await this.userProfileRepository.save(userProfile);
+
+      // Generate tokens
+      const tokens = this.authService.generateTokens({ sub: savedUser.id });
+      savedUser.refreshToken = await bcrypt.hash(tokens.refreshToken, 10);
+      await this.userRepository.save(savedUser);
+
+      // Set cookies
+      res.cookie('accessToken', tokens.accessToken, {
+        httpOnly: true, secure: true, sameSite: 'strict', maxAge: 15 * 60 * 1000,
+      });
+      res.cookie('refreshToken', tokens.refreshToken, {
+        httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      return res.status(201).json({ message: 'User registered successfully', success: true });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({
+        statusCode: 500,
+        message: err.message || 'Internal server error',
         success: false,
       });
     }
-
-    const isValidOtp = await this.otpService.validateOtp({
-      email: isEmail ? dto.emailOrPhone : undefined,
-      phone_no: !isEmail ? dto.emailOrPhone : undefined,
-      code: dto.otp,
-    });
-
-    if (!isValidOtp) {
-      return res.status(400).json({
-        statusCode: 400,
-        message: 'Invalid or expired OTP',
-        success: false,
-      });
-    }
-
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
-
-    const user = this.userRepository.create({
-      username: dto.username,
-      email: isEmail ? dto.emailOrPhone : undefined,
-      phone_no: !isEmail ? dto.emailOrPhone : undefined,
-      password: hashedPassword,
-    });
-
-    const savedUser = await this.userRepository.save(user);
-
-// Create profile
-    const userProfile = this.userProfileRepository.create({
-      user_id: savedUser.id,
-      name: savedUser.username,
-      role: dto.role,
-      paid: false,
-      star: 1,
-    });
-    await this.userProfileRepository.save(userProfile);
-
-    // Generate tokens
-    const tokens = this.authService.generateTokens({ sub: savedUser.id });
-    savedUser.refreshToken = await bcrypt.hash(tokens.refreshToken, 10);
-    await this.userRepository.save(savedUser);
-
-    // Set cookies
-    res.cookie('accessToken', tokens.accessToken, {
-      httpOnly: true, secure: true, sameSite: 'strict', maxAge: 15 * 60 * 1000,
-    });
-    res.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    return res.status(201).json({ message: 'User registered successfully', success: true });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({
-      statusCode: 500,
-      message: err.message || 'Internal server error',
-      success: false,
-    });
   }
-}
 
 
   async login(dto: LoginDto, res: Response) {
@@ -516,6 +517,99 @@ async register(dto: RegisterDto, res: Response) {
   //     };
   // }
 
+  // async updateProfile(dto: UpdateUserProfileDto, payload: any) {
+  //   const userId = payload?.sub || payload?.id || payload?.userId;
+  //   if (!userId) throw new UnauthorizedException("Invalid token");
+
+  //   const user = await this.userRepository.findOne({ where: { id: userId } });
+  //   const userProfile = await this.userProfileRepository.findOne({ where: { user_id: userId } });
+
+  //   if (!user || !userProfile) throw new NotFoundException("User not found");
+
+  //   const imageChanged = dto.imageChanged === 'true'
+
+  //   // ✅ New image upload
+  //   if (imageChanged && dto.ProfilePicture) {
+  //     const base64Str = dto.ProfilePicture.split(";base64,")[1];
+  //     if (!base64Str) throw new BadRequestException("Invalid base64 image");
+
+  //     const buffer = Buffer.from(base64Str, "base64");
+  //     const fileName = `${userId}.jpg`;
+
+  //     if (userProfile.ProfilePicture) {
+  //       const oldKey = userProfile.ProfilePicture.split(".com/")[1];
+  //       if (oldKey) await this.uploadService.deleteFile(oldKey);
+  //     }
+
+  //     // const uploaded = await this.uploadService.uploadFile(buffer, "profiles", fileName);
+  //     //   const uploaded = await this.uploadService.uploadFile(
+  //     //     buffer,
+  //     //     "profiles",
+  //     //     fileName,
+  //     //     "public, max-age=0, must-revalidate"
+  //     //   );
+
+  //     //   userProfile.ProfilePicture = uploaded.publicUrl || uploaded.url;
+  //     // }
+
+  //     const uploaded = await this.uploadService.uploadFile(
+  //       buffer,
+  //       "profiles",
+  //       fileName,
+  //       "no-cache, no-store, must-revalidate"
+  //     );
+
+  //     //  ✅   Add timestamp to URL to bust cache - THIS IS CRITICAL!
+  //     const timestamp = Date.now();
+  //     const imageUrl = uploaded.publicUrl || uploaded.url;
+  //     userProfile.ProfilePicture = `${imageUrl}?v=${timestamp}`;
+  //   }
+
+  //   // ✅ Remove image
+  //   if (imageChanged && !dto.ProfilePicture) {
+  //     if (userProfile.ProfilePicture) {
+  //       const oldKey = userProfile.ProfilePicture.split(".com/")[1];
+  //       if (oldKey) await this.uploadService.deleteFile(oldKey);
+  //     }
+  //     userProfile.ProfilePicture = '';
+  //   }
+
+  //   // ✅ Update fields
+  //   userProfile.name = dto.name ?? userProfile.name;
+  //   userProfile.bio = dto.bio ?? userProfile.bio;
+  //   userProfile.url = dto.url ?? userProfile.url;
+
+  //   await this.userProfileRepository.save(userProfile);
+
+  //   // ✅ Update username
+  //   if (dto.username) {
+  //     const exists = await this.userRepository.findOne({ where: { username: dto.username } });
+  //     if (exists && exists.id !== user.id) throw new BadRequestException("Username already taken");
+
+  //     user.username = dto.username;
+  //     await this.userRepository.save(user);
+  //   }
+
+  //   // ✅ Fetch updated data
+  //   const updatedUser = await this.userRepository.findOne({
+  //     where: { id: userId },
+  //     relations: ["userProfile"],
+  //   });
+  //   if (!updatedUser) throw new NotFoundException('User not found');
+  //   return {
+  //     success: true,
+  //     message: "Profile updated successfully",
+  //     data: {
+  //       username: updatedUser.username,
+  //       name: updatedUser.userProfile.name,
+  //       bio: updatedUser.userProfile.bio,
+  //       url: updatedUser.userProfile.url,
+  //       ProfilePicture: updatedUser.userProfile.ProfilePicture,
+  //     },
+  //   };
+  // }
+
+
   async updateProfile(dto: UpdateUserProfileDto, payload: any) {
     const userId = payload?.sub || payload?.id || payload?.userId;
     if (!userId) throw new UnauthorizedException("Invalid token");
@@ -527,34 +621,55 @@ async register(dto: RegisterDto, res: Response) {
 
     const imageChanged = dto.imageChanged === 'true'
 
-    // ✅ New image upload
+    // ✅ New image upload with compression
     if (imageChanged && dto.ProfilePicture) {
       const base64Str = dto.ProfilePicture.split(";base64,")[1];
       if (!base64Str) throw new BadRequestException("Invalid base64 image");
 
       const buffer = Buffer.from(base64Str, "base64");
+
+      // ✅ COMPRESS IMAGE USING SHARP
+      const compressedBuffer = await sharp(buffer)
+        .resize(800, 800, { // Max 800x800, maintains aspect ratio
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .jpeg({
+          quality: 80, // 80% quality (0-100)
+          progressive: true // Progressive JPEG for faster loading
+        })
+        .toBuffer();
+
+      console.log(`📊 Original size: ${buffer.length} bytes`);
+      console.log(`📊 Compressed size: ${compressedBuffer.length} bytes`);
+      console.log(`✅ Reduced by: ${((1 - compressedBuffer.length / buffer.length) * 100).toFixed(1)}%`);
+
       const fileName = `${userId}.jpg`;
 
+      // Delete old image if exists
       if (userProfile.ProfilePicture) {
-        const oldKey = userProfile.ProfilePicture.split(".com/")[1];
+        const oldKey = userProfile.ProfilePicture.split(".com/")[1]?.split('?')[0];
         if (oldKey) await this.uploadService.deleteFile(oldKey);
       }
 
-      // const uploaded = await this.uploadService.uploadFile(buffer, "profiles", fileName);
+      // Upload compressed image
       const uploaded = await this.uploadService.uploadFile(
-        buffer,
+        compressedBuffer, // Use compressed buffer
         "profiles",
         fileName,
-        "public, max-age=0, must-revalidate"
+        "no-cache, no-store, must-revalidate"
       );
 
-      userProfile.ProfilePicture = uploaded.publicUrl || uploaded.url;
+      // ✅ Add timestamp for cache busting
+      const timestamp = Date.now();
+      const imageUrl = uploaded.publicUrl || uploaded.url;
+      userProfile.ProfilePicture = `${imageUrl}?v=${timestamp}`;
     }
 
     // ✅ Remove image
     if (imageChanged && !dto.ProfilePicture) {
       if (userProfile.ProfilePicture) {
-        const oldKey = userProfile.ProfilePicture.split(".com/")[1];
+        const oldKey = userProfile.ProfilePicture.split(".com/")[1]?.split('?')[0];
         if (oldKey) await this.uploadService.deleteFile(oldKey);
       }
       userProfile.ProfilePicture = '';
@@ -581,7 +696,9 @@ async register(dto: RegisterDto, res: Response) {
       where: { id: userId },
       relations: ["userProfile"],
     });
+
     if (!updatedUser) throw new NotFoundException('User not found');
+
     return {
       success: true,
       message: "Profile updated successfully",
