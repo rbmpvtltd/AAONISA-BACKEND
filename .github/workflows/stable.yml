@@ -1,0 +1,48 @@
+name: Deploy NestJS Stable to VPS
+
+on:
+  push:
+    branches:
+      - stable  # Trigger only on stable branch
+
+jobs:
+  deploy-stable:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Deploy to VPS (Stable)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 88.222.213.106
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            # Load NVM
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm use 20
+            node -v
+            npm -v
+
+            echo "Deploying NestJS app (stable branch)..."
+
+            # Go to stable folder
+            cd ~/office_work/AAONISA-BACKEND-STABLE || exit 1
+
+            # Pull latest stable code
+            git pull origin stable || { echo 'Git pull failed'; exit 1; }
+
+            # Install dependencies
+            npm install || { echo 'npm install failed'; exit 1; }
+
+            # Build project
+            npm run build || { echo 'Build failed'; exit 1; }
+
+            # Restart PM2 processes for stable
+            pm2 restart stable-backend-api || { echo 'PM2 stable-backend-api restart failed'; exit 1; }
+            pm2 restart stable-backend-worker || { echo 'PM2 stable-backend-worker restart failed'; exit 1; }
+
+            echo "Stable deployment finished successfully ✅"
