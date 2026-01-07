@@ -32,6 +32,7 @@ import { Comment } from "./modules/comments/entities/comment.entity";
       redis: {
         host: "127.0.0.1",
         port: 6379,
+        keyPrefix: "testing",
         maxRetriesPerRequest: null,
         enableReadyCheck: false,
       },
