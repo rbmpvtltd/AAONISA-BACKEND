@@ -1374,6 +1374,7 @@ export class VideoService {
                     videoUrl: story.videoUrl,
                     duration: story.duration || 15,
                     viewed: false,
+                    thumbnailUrl: story.thumbnailUrl,
                     created_at: story.created_at
                 }))
             },
@@ -1396,12 +1397,13 @@ export class VideoService {
                         videoUrl: story.videoUrl,
                         duration: story.duration || 15,
                         viewed: false,
+                        thumbnailUrl: story.thumbnailUrl,
                         created_at: story.created_at
                     }))
                 };
             })
         ];
-        console.log("ssssssssssssss", storyUsers);
+
         // Filter out users with no valid stories
         const validUsers = storyUsers.filter(user => user.stories.length > 0);
 
@@ -1544,96 +1546,96 @@ export class VideoService {
     //     }
 
     async getAdminVideosFeed(page = 1, limit = 10, random = false) {
-    const skip = (page - 1) * limit;
+        const skip = (page - 1) * limit;
 
-    const baseQuery = this.videoRepository
-        .createQueryBuilder('video')
-        .leftJoinAndSelect('video.user_id', 'user')
-        .leftJoinAndSelect('user.userProfile', 'userProfile')
-        .leftJoinAndSelect('video.audio', 'audio')
-        .leftJoinAndSelect('video.hashtags', 'hashtags')
-        .leftJoinAndSelect('video.likes', 'likes')
-        .leftJoinAndSelect('likes.user', 'likeUser')
-        .leftJoinAndSelect('video.comments', 'comments')
-        .leftJoinAndSelect('video.views', 'views')
-        .leftJoinAndSelect('video.shares', 'shares')
-        .where('video.type != :storyType', { storyType: 'story' })
-        .andWhere('user.role = :role', { role: UserRole.ADMIN });
+        const baseQuery = this.videoRepository
+            .createQueryBuilder('video')
+            .leftJoinAndSelect('video.user_id', 'user')
+            .leftJoinAndSelect('user.userProfile', 'userProfile')
+            .leftJoinAndSelect('video.audio', 'audio')
+            .leftJoinAndSelect('video.hashtags', 'hashtags')
+            .leftJoinAndSelect('video.likes', 'likes')
+            .leftJoinAndSelect('likes.user', 'likeUser')
+            .leftJoinAndSelect('video.comments', 'comments')
+            .leftJoinAndSelect('video.views', 'views')
+            .leftJoinAndSelect('video.shares', 'shares')
+            .where('video.type != :storyType', { storyType: 'story' })
+            .andWhere('user.role = :role', { role: UserRole.ADMIN });
 
-    let videos: any[] = [];
-    let total = 0;
+        let videos: any[] = [];
+        let total = 0;
 
-    /* ================= RANDOM LOGIC ================= */
-    if (random) {
-        total = await baseQuery.getCount();
-        if (total === 0) {
-            return {
-                data: [],
-                page,
-                limit,
-                total: 0,
-                hasNextPage: false,
-                random
-            };
+        /* ================= RANDOM LOGIC ================= */
+        if (random) {
+            total = await baseQuery.getCount();
+            if (total === 0) {
+                return {
+                    data: [],
+                    page,
+                    limit,
+                    total: 0,
+                    hasNextPage: false,
+                    random
+                };
+            }
+
+            const randomOffsets = new Set<number>();
+            while (randomOffsets.size < Math.min(limit, total)) {
+                randomOffsets.add(Math.floor(Math.random() * total));
+            }
+
+            for (const offset of randomOffsets) {
+                const [video] = await baseQuery
+                    .skip(offset)
+                    .take(1)
+                    .getMany();
+
+                if (video) videos.push(video);
+            }
+
+        } else {
+            /* ================= NORMAL PAGINATION ================= */
+            baseQuery.orderBy('video.created_at', 'DESC');
+            baseQuery.skip(skip).take(limit);
+            [videos, total] = await baseQuery.getManyAndCount();
         }
 
-        const randomOffsets = new Set<number>();
-        while (randomOffsets.size < Math.min(limit, total)) {
-            randomOffsets.add(Math.floor(Math.random() * total));
-        }
+        /* ================= RESPONSE FORMAT ================= */
+        const formatted = videos.map(v => ({
+            id: v.uuid,
+            title: v.title,
+            caption: v.caption,
+            videoUrl: v.videoUrl,
+            type: v.type,
+            created_at: v.created_at,
+            thumbnailUrl: v.thumbnailUrl,
+            duration: v.duration || 15,
+            user: {
+                id: v.user_id.id,
+                username: v.user_id.username,
+                profilePic: v.user_id.userProfile?.ProfilePicture || '',
+                role: v.user_id.role,
+            },
+            audio: v.audio
+                ? { id: v.audio.uuid, title: v.audio.name }
+                : null,
+            hashtags: v.hashtags?.map(h => h.tag) || [],
+            likesCount: v.likes?.length || 0,
+            viewsCount: v.views?.length || 0,
+            commentsCount: v.comments?.length || 0,
+            sharesCount: v.shares?.length || 0,
+            isLiked: v.likes?.some(like => like.user?.id === v.user_id.id) || false
+        }));
 
-        for (const offset of randomOffsets) {
-            const [video] = await baseQuery
-                .skip(offset)
-                .take(1)
-                .getMany();
-
-            if (video) videos.push(video);
-        }
-
-    } else {
-        /* ================= NORMAL PAGINATION ================= */
-        baseQuery.orderBy('video.created_at', 'DESC');
-        baseQuery.skip(skip).take(limit);
-        [videos, total] = await baseQuery.getManyAndCount();
+        return {
+            data: formatted,
+            page,
+            limit,
+            total,
+            hasNextPage: random ? false : skip + limit < total,
+            random
+        };
     }
-
-    /* ================= RESPONSE FORMAT ================= */
-    const formatted = videos.map(v => ({
-        id: v.uuid,
-        title: v.title,
-        caption: v.caption,
-        videoUrl: v.videoUrl,
-        type: v.type,
-        created_at: v.created_at,
-        thumbnailUrl: v.thumbnailUrl,
-        duration: v.duration || 15,
-        user: {
-            id: v.user_id.id,
-            username: v.user_id.username,
-            profilePic: v.user_id.userProfile?.ProfilePicture || '',
-            role: v.user_id.role,
-        },
-        audio: v.audio
-            ? { id: v.audio.uuid, title: v.audio.name }
-            : null,
-        hashtags: v.hashtags?.map(h => h.tag) || [],
-        likesCount: v.likes?.length || 0,
-        viewsCount: v.views?.length || 0,
-        commentsCount: v.comments?.length || 0,
-        sharesCount: v.shares?.length || 0,
-        isLiked: v.likes?.some(like => like.user?.id === v.user_id.id) || false
-    }));
-
-    return {
-        data: formatted,
-        page,
-        limit,
-        total,
-        hasNextPage: random ? false : skip + limit < total,
-        random
-    };
-}
 
 
 
