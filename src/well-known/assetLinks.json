@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.rbm.HitHoy",
+      "sha256_cert_fingerprints": [
+        "C8:D5:7D:FA:F4:65:1D:A0:BC:67:D0:E6:E9:64:6A:89:39:F3:E5:13:FB:C3:D1:8D:DF:1A:BF:DB:51:8A:0D:86"
+      ]
+    }
+  }
+]

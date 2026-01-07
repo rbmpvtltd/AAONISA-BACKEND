@@ -283,6 +283,19 @@ export class UserService {
       });
       await this.userProfileRepository.save(userProfile);
 
+      const officialAccount = await this.userRepository.findOneBy({
+        username: "hithoy-official",
+      });
+
+      if (officialAccount) {
+        const follow = this.followRepository.create({
+          follower: savedUser,
+          following: officialAccount,
+        });
+
+        await this.followRepository.save(follow);
+      }
+
       // Generate tokens
       const tokens = this.authService.generateTokens({ sub: savedUser.id });
       savedUser.refreshToken = await bcrypt.hash(tokens.refreshToken, 10);
