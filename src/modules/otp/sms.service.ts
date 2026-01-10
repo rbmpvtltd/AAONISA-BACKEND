@@ -6,7 +6,7 @@ export class SmsService {
   private readonly logger = new Logger(SmsService.name);
 
   private smsApiUrl = 'https://www.fast2sms.com/dev/bulkV2';
-  private smsApiKey =  process.env.SMS_API_KEY;
+  private smsApiKey = process.env.SMS_API_KEY;
 
   async sendOtpSms(numbers: string, otpCode: string): Promise<void> {
     try {
