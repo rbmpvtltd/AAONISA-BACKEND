@@ -8,8 +8,6 @@ export class EmailService {
 
   private transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
@@ -18,10 +16,10 @@ export class EmailService {
 
   async sendOtp(to: string, otp: string) {
     const mailOptions = {
-      from: `"AAO NI SA" <${process.env.EMAIL_USER}>`,
+      from: `"Hithoy" <${process.env.EMAIL_USER}>`,
       to,
       subject: 'Your OTP Code',
-      text: `Your OTP is: ${otp}. It will be expired in 1 minute.`,
+      text: `Your HitHoy verification code is ${otp}. Welcome to ROTARY BALAJI MEDIA PRIVATE LIMITED.`,
     };
 
     try {
