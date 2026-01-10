@@ -43,6 +43,18 @@ async function bootstrap() {
 	});
 
 	app.use("/uploads", express.static(join(process.cwd(), "src", "uploads")));
+	// .well-known serve
+	app.use(
+		"/.well-known",
+		express.static(join(process.cwd(), "src", "well-known"), {
+			setHeaders: (res, path) => {
+				// Apple ke liye important
+				if (path.endsWith("apple-app-site-association")) {
+					res.setHeader("Content-Type", "application/json");
+				}
+			},
+		})
+	);
 	app.use(cookieParser());
 	app.setGlobalPrefix("api");
 

@@ -323,24 +323,24 @@ interface DeleteMessagePayload {
   namespace: "/socket.io",
   transports: ['websocket', 'polling'],
 })
-export class AppGateway 
+export class AppGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit {
-  
+
   @WebSocketServer()
   server: Server;
-  
+
   private readonly logger = new Logger(AppGateway.name);
-  
+
   // Maps userId to their current socketId
   private readonly userSockets = new Map<string, string>();
-  
+
   // Maps socketId to set of rooms they've joined
   private readonly clientRooms = new Map<string, Set<string>>();
 
   // Track if gateway is initialized
   private isInitialized = false;
-  constructor(private readonly chatService: ChatService,private readonly viewService: ViewService,private readonly tokenService: TokenService,@InjectRepository(User)
-  private readonly userRepo: Repository<User>) {}
+  constructor(private readonly chatService: ChatService, private readonly viewService: ViewService, private readonly tokenService: TokenService, @InjectRepository(User)
+  private readonly userRepo: Repository<User>) { }
   /* ========================================
      GATEWAY INITIALIZATION
   ======================================== */
@@ -349,7 +349,7 @@ export class AppGateway
       this.logger.warn('⚠️ Gateway already initialized - skipping duplicate initialization');
       return;
     }
-    
+
     this.isInitialized = true;
     this.logger.log('🚀 WebSocket Gateway Initialized');
   }
@@ -390,7 +390,7 @@ export class AppGateway
     @ConnectedSocket() client: Socket
   ): void {
     const { roomId } = data;
-    
+
     if (!roomId) {
       this.logger.warn(`Client ${client.id} attempted to join without roomId`);
       return;
@@ -436,7 +436,7 @@ export class AppGateway
   ): Promise<void> {
     const startTime = Date.now();
     const requestId = `${client.id}-${startTime}`;
-    
+
     try {
       this.logger.log(
         `📥 [${requestId}] Message from ${payload.senderId} to ${payload.receiverId}`
@@ -444,8 +444,8 @@ export class AppGateway
 
       const { sessionId, senderId, receiverId, text } = payload;
       const sender = await this.userRepo.findOne({ where: { id: senderId } });
-      if(!sender) {
-        return 
+      if (!sender) {
+        return
       }
       // Validate payload
       if (!sessionId || !senderId || !receiverId || !text) {
@@ -463,10 +463,10 @@ export class AppGateway
 
       // Generate consistent room ID
       const roomId = this.generateRoomId(senderId, receiverId);
-if(!roomId) {
-  console.error(`[${requestId}] roomId is invalid`);
-  return;
-}
+      if (!roomId) {
+        console.error(`[${requestId}] roomId is invalid`);
+        return;
+      }
 
       // Emit to room
       this.server.to(roomId).emit("Message", {
@@ -477,8 +477,8 @@ if(!roomId) {
         createdAt: savedMessage.created_at,
       });
       let inSameRoom = await this.areBothUsersInRoom(roomId)
-      if(!inSameRoom) {
-        await this.tokenService.sendNotification(receiverId,"Hithoy",`${sender.username} sent you a chat`)
+      if (!inSameRoom) {
+        await this.tokenService.sendNotification(receiverId, "Hithoy", `${sender.username} sent you a chat`)
       }
       // const duration = Date.now() - startTime;
       // this.logger.log(
@@ -488,7 +488,7 @@ if(!roomId) {
       this.logger.error(`[${requestId}] Error handling sendMessage:`, error);
       client.emit("error", { message: "Failed to send message" });
     }
-    
+
   }
 
   @SubscribeMessage("getPreviousMessages")
@@ -549,9 +549,9 @@ if(!roomId) {
       }
 
       await this.chatService.deleteMessageForMe(userId, messageId);
-      
+
       client.emit("messageDeletedForMe", { messageId });
-      
+
       this.logger.log(`🗑️ Message ${messageId} deleted for user ${userId}`);
     } catch (error) {
       this.logger.error("Error deleting message for user:", error);
@@ -559,49 +559,49 @@ if(!roomId) {
     }
   }
   @SubscribeMessage('getStoryViews')
-async handleGetStoryViews(
-  @MessageBody() payload,
-  @ConnectedSocket() client: Socket
-){
-  try {
-    const { storyId } = payload;
-    if (!storyId) {
-      client.emit("error", { message: "Invalid delete payload" });
-      return;
+  async handleGetStoryViews(
+    @MessageBody() payload,
+    @ConnectedSocket() client: Socket
+  ) {
+    try {
+      const { storyId } = payload;
+      if (!storyId) {
+        client.emit("error", { message: "Invalid delete payload" });
+        return;
+      }
+      const views = await this.viewService.getAllViews(storyId);
+      client.emit('storyViews', { views });
+
+      return; // <-- VERY IMPORTANT
     }
-    const views = await this.viewService.getAllViews(storyId);
-    client.emit('storyViews', { views });
-
-    return; // <-- VERY IMPORTANT
-  } 
-  catch (error) {
-    this.logger.error("Error getting views:", error);
-    client.emit("error", { message: "Failed to get story views" });
+    catch (error) {
+      this.logger.error("Error getting views:", error);
+      client.emit("error", { message: "Failed to get story views" });
+    }
   }
-}
   @SubscribeMessage('viewStory')
-async handleStoryView(
-  @MessageBody() payload: { userId: string; storyId: string },
-  @ConnectedSocket() client: Socket
-) {
-  try {
-    const { userId, storyId } = payload;
+  async handleStoryView(
+    @MessageBody() payload: { userId: string; storyId: string },
+    @ConnectedSocket() client: Socket
+  ) {
+    try {
+      const { userId, storyId } = payload;
 
-    const result = await this.viewService.viewReel(userId, storyId);
+      const result = await this.viewService.viewReel(userId, storyId);
 
-    // Agar pehle hi viewed tha to emit mat karo
-    if (!result.viewed) return;
+      // Agar pehle hi viewed tha to emit mat karo
+      if (!result.viewed) return;
 
-    // NEW VIEW DETAILS FETCH KARO
-    const newView = await this.viewService.getSingleView(userId, storyId);
+      // NEW VIEW DETAILS FETCH KARO
+      const newView = await this.viewService.getSingleView(userId, storyId);
 
-    // 🔥 Real-time emit to story room
-    this.server.to(`story:${storyId}`).emit("story:newView", newView);
+      // 🔥 Real-time emit to story room
+      this.server.to(`story:${storyId}`).emit("story:newView", newView);
 
-  } catch (error) {
-    client.emit("error", { message: "Failed to add story view" });
+    } catch (error) {
+      client.emit("error", { message: "Failed to add story view" });
+    }
   }
-}
 
   @SubscribeMessage("deleteMessageForEveryone")
   async handleDeleteForEveryone(
@@ -617,7 +617,7 @@ async handleStoryView(
       }
 
       await this.chatService.deleteMessageForEveryone(userId, messageId);
-      
+
       this.server.to(roomId).emit("messageDeleted", {
         messageId,
         deletedForEveryone: true,
@@ -647,7 +647,7 @@ async handleStoryView(
    */
   emitToUser(userId: string, event: string, data: any): void {
     const socketId = this.userSockets.get(userId);
-    
+
     if (socketId) {
       this.server.to(socketId).emit(event, data);
       this.logger.debug(`Emitted ${event} to user ${userId}`);
@@ -740,8 +740,8 @@ async handleStoryView(
   }
 
   async areBothUsersInRoom(roomId: string): Promise<boolean> {
-  const socketsInRoom = await this.server.in(roomId).fetchSockets();
-  return socketsInRoom.length >= 2;
-}
+    const socketsInRoom = await this.server.in(roomId).fetchSockets();
+    return socketsInRoom.length >= 2;
+  }
 
 }
