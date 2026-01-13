@@ -16,17 +16,17 @@ export class ViewService {
 
     @InjectRepository(Video)
     private readonly videoRepository: Repository<Video>,
-  ) {}
+  ) { }
 
   async viewReel(userId: string, reelId: string) {
     const alreadyViewed = await this.viewRepository.findOne({
-      where: { user: { id : userId }, reel: { uuid: reelId } },
+      where: { user: { id: userId }, reel: { uuid: reelId } },
     });
 
     if (alreadyViewed) {
       return { message: 'Reel already viewed', viewed: false };
     }
-    
+
     const userInfo = await this.userRepository.findOne({ where: { id: userId } });
     if (!userInfo) {
       throw new NotFoundException('User not found');
@@ -41,35 +41,35 @@ export class ViewService {
     return { message: 'Reel viewed successfully', viewed: true };
   }
   async getAllViews(storyId: string) {
-  const views = await this.viewRepository
-  .createQueryBuilder("view")
-  .leftJoin("view.user", "user")
-  .leftJoin("user.userProfile", "profile")
-  .select([
-    "view.view_id AS view_id",
-    "view.createdAt AS createdAt",
-    "user.username AS username",
-    "profile.ProfilePicture AS profilePic",
-  ])
-  .where("view.reelUuid = :storyId", { storyId })
-  .orderBy("view.createdAt", "DESC")
-  .getRawMany();
-  return views;
-}
-async getSingleView(userId: string, storyId: string) {
-  return await this.viewRepository
-    .createQueryBuilder("view")
-    .leftJoin("view.user", "user")
-    .leftJoin("user.userProfile", "profile")
-    .select([
-      "view.view_id AS view_id",
-      "view.createdAt AS createdAt",
-      "user.username AS username",
-      "profile.ProfilePicture AS profilePic",
-    ])
-    .where("user.id = :userId", { userId })
-    .andWhere("view.reelUuid = :storyId", { storyId })
-    .getRawOne();
-}
+    const views = await this.viewRepository
+      .createQueryBuilder("view")
+      .leftJoin("view.user", "user")
+      .leftJoin("user.userProfile", "profile")
+      .select([
+        "view.view_id AS view_id",
+        "view.createdAt AS createdAt",
+        "user.username AS username",
+        "profile.ProfilePicture AS profilePic",
+      ])
+      .where("view.reelUuid = :storyId", { storyId })
+      .orderBy("view.createdAt", "DESC")
+      .getRawMany();
+    return views;
+  }
+  async getSingleView(userId: string, storyId: string) {
+    return await this.viewRepository
+      .createQueryBuilder("view")
+      .leftJoin("view.user", "user")
+      .leftJoin("user.userProfile", "profile")
+      .select([
+        "view.view_id AS view_id",
+        "view.createdAt AS createdAt",
+        "user.username AS username",
+        "profile.ProfilePicture AS profilePic",
+      ])
+      .where("user.id = :userId", { userId })
+      .andWhere("view.reelUuid = :storyId", { storyId })
+      .getRawOne();
+  }
 
 }

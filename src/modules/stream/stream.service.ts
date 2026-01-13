@@ -1555,9 +1555,11 @@ export class VideoService {
             .leftJoinAndSelect('video.audio', 'audio')
             .leftJoinAndSelect('video.hashtags', 'hashtags')
             .leftJoinAndSelect('video.likes', 'likes')
-            .leftJoinAndSelect('likes.user', 'likeUser')
-            .leftJoinAndSelect('video.comments', 'comments')
             .leftJoinAndSelect('video.views', 'views')
+            .leftJoinAndSelect('likes.user', 'likeUser')
+            .leftJoinAndSelect('views.user', 'viewUser')
+            .leftJoinAndSelect('video.comments', 'comments')
+
             .leftJoinAndSelect('video.shares', 'shares')
             .where('video.type != :storyType', { storyType: 'story' })
             .andWhere('user.role = :role', { role: UserRole.ADMIN });
@@ -1624,7 +1626,9 @@ export class VideoService {
             viewsCount: v.views?.length || 0,
             commentsCount: v.comments?.length || 0,
             sharesCount: v.shares?.length || 0,
-            isLiked: v.likes?.some(like => like.user?.id === v.user_id.id) || false
+            isLiked: v.likes?.some(like => like.user?.id === v.user_id.id) || false,
+            isViewed: v.views?.some(view => view.user?.id === v.user_id.id) || false
+
         }));
 
         return {
@@ -1656,7 +1660,9 @@ export class VideoService {
             .leftJoinAndSelect('video.audio', 'audio')
             .leftJoinAndSelect('video.hashtags', 'hashtags')
             .leftJoinAndSelect('video.likes', 'likes')
+            .leftJoinAndSelect("video.views", "view")
             .leftJoinAndSelect('likes.user', 'likeUser')
+            .leftJoinAndSelect('view.user', 'viewUser')
             .leftJoinAndSelect('video.comments', 'comments')
             .leftJoinAndSelect('video.views', 'views')
             .leftJoinAndSelect('video.shares', 'shares')
@@ -1734,7 +1740,8 @@ export class VideoService {
             viewsCount: v.views?.length || 0,
             commentsCount: v.comments?.length || 0,
             shareCount: v.shares?.length || 0,
-            isLiked: v.likes?.some(like => like.user?.id === userId) || false
+            isLiked: v.likes?.some(like => like.user?.id === userId) || false,
+            isViewed: v.views?.some(view => view.user?.id === userId) || false
         }));
 
         return {
@@ -1749,95 +1756,96 @@ export class VideoService {
 
 
     async getExploreVideosWithMain(
-    videoId: string,
-    limit = 10
-) {
-    // 1️⃣ Main video
-    const mainVideo = await this.videoRepository
-        .createQueryBuilder('video')
-        .leftJoinAndSelect('video.user_id', 'videoUser')
-        .leftJoinAndSelect('videoUser.userProfile', 'userProfile')
-        .leftJoinAndSelect('video.audio', 'audio')
-        .leftJoinAndSelect('video.hashtags', 'hashtags')
-        .leftJoinAndSelect('video.likes', 'likes')
-        .leftJoinAndSelect('likes.user', 'likeUser')
-        .leftJoinAndSelect('video.views', 'views')
-        .leftJoinAndSelect('video.comments', 'comments')
-        .leftJoinAndSelect('video.shares', 'shares')
-        .where('video.uuid = :videoId', { videoId })
-        .andWhere('video.type IN (:...types)', { types: ['reels', 'news'] })
-        .getOne();
+        videoId: string,
+        limit = 10
+    ) {
+        // 1️⃣ Main video
+        const mainVideo = await this.videoRepository
+            .createQueryBuilder('video')
+            .leftJoinAndSelect('video.user_id', 'videoUser')
+            .leftJoinAndSelect('videoUser.userProfile', 'userProfile')
+            .leftJoinAndSelect('video.audio', 'audio')
+            .leftJoinAndSelect('video.hashtags', 'hashtags')
+            .leftJoinAndSelect('video.likes', 'likes')
+            .leftJoinAndSelect('likes.user', 'likeUser')
+            .leftJoinAndSelect('video.views', 'views')
+            .leftJoinAndSelect('video.comments', 'comments')
+            .leftJoinAndSelect('video.shares', 'shares')
+            .where('video.uuid = :videoId', { videoId })
+            .andWhere('video.type IN (:...types)', { types: ['reels', 'news'] })
+            .getOne();
 
-    if (!mainVideo) {
-        return { data: [], total: 0 };
+        if (!mainVideo) {
+            return { data: [], total: 0 };
+        }
+
+        // 2️⃣ Count eligible videos (excluding main)
+        const totalCount = await this.videoRepository
+            .createQueryBuilder('video')
+            .where('video.type IN (:...types)', { types: ['reels', 'news'] })
+            .andWhere('video.uuid != :videoId', { videoId })
+            .getCount();
+
+        if (totalCount === 0) {
+            return { data: [mainVideo], total: 1 };
+        }
+
+        // 3️⃣ Random offset
+        const randomOffset = Math.max(
+            0,
+            Math.floor(Math.random() * Math.max(1, totalCount - (limit - 1)))
+        );
+
+        // 4️⃣ Fetch random videos using offset
+        const otherVideos = await this.videoRepository
+            .createQueryBuilder('video')
+            .leftJoinAndSelect('video.user_id', 'videoUser')
+            .leftJoinAndSelect('videoUser.userProfile', 'userProfile')
+            .leftJoinAndSelect('video.audio', 'audio')
+            .leftJoinAndSelect('video.hashtags', 'hashtags')
+            .leftJoinAndSelect('video.likes', 'likes')
+            .leftJoinAndSelect('likes.user', 'likeUser')
+            .leftJoinAndSelect('video.views', 'views')
+            .leftJoinAndSelect('video.comments', 'comments')
+
+            .leftJoinAndSelect('video.shares', 'shares')
+            .where('video.type IN (:...types)', { types: ['reels', 'news'] })
+            .andWhere('video.uuid != :videoId', { videoId })
+            .skip(randomOffset)
+            .take(limit - 1)
+            .getMany();
+
+        // 5️⃣ Combine
+        const videos = [mainVideo, ...otherVideos];
+
+        // 6️⃣ Format
+        const formatted = videos.map(v => ({
+            id: v.uuid,
+            title: v.title,
+            caption: v.caption,
+            videoUrl: v.videoUrl,
+            type: v.type,
+            created_at: v.created_at,
+            thumbnailUrl: v.thumbnailUrl,
+            user: {
+                id: v.user_id.id,
+                username: v.user_id.username,
+                profilePic: v.user_id.userProfile?.ProfilePicture || '',
+            },
+            audio: v.audio
+                ? { id: v.audio.uuid, title: v.audio.name }
+                : null,
+            hashtags: v.hashtags?.map(h => h.tag) || [],
+            likesCount: v.likes?.length || 0,
+            viewsCount: v.views?.length || 0,
+            shareCount: v.shares?.length || 0,
+        }));
+
+        return {
+            data: formatted,
+            total: formatted.length,
+        };
     }
-
-    // 2️⃣ Count eligible videos (excluding main)
-    const totalCount = await this.videoRepository
-        .createQueryBuilder('video')
-        .where('video.type IN (:...types)', { types: ['reels', 'news'] })
-        .andWhere('video.uuid != :videoId', { videoId })
-        .getCount();
-
-    if (totalCount === 0) {
-        return { data: [mainVideo], total: 1 };
-    }
-
-    // 3️⃣ Random offset
-    const randomOffset = Math.max(
-        0,
-        Math.floor(Math.random() * Math.max(1, totalCount - (limit - 1)))
-    );
-
-    // 4️⃣ Fetch random videos using offset
-    const otherVideos = await this.videoRepository
-        .createQueryBuilder('video')
-        .leftJoinAndSelect('video.user_id', 'videoUser')
-        .leftJoinAndSelect('videoUser.userProfile', 'userProfile')
-        .leftJoinAndSelect('video.audio', 'audio')
-        .leftJoinAndSelect('video.hashtags', 'hashtags')
-        .leftJoinAndSelect('video.likes', 'likes')
-        .leftJoinAndSelect('likes.user', 'likeUser')
-        .leftJoinAndSelect('video.views', 'views')
-        .leftJoinAndSelect('video.comments', 'comments')
-        .leftJoinAndSelect('video.shares', 'shares')
-        .where('video.type IN (:...types)', { types: ['reels', 'news'] })
-        .andWhere('video.uuid != :videoId', { videoId })
-        .skip(randomOffset)
-        .take(limit - 1)
-        .getMany();
-
-    // 5️⃣ Combine
-    const videos = [mainVideo, ...otherVideos];
-
-    // 6️⃣ Format
-    const formatted = videos.map(v => ({
-        id: v.uuid,
-        title: v.title,
-        caption: v.caption,
-        videoUrl: v.videoUrl,
-        type: v.type,
-        created_at: v.created_at,
-        thumbnailUrl: v.thumbnailUrl,
-        user: {
-            id: v.user_id.id,
-            username: v.user_id.username,
-            profilePic: v.user_id.userProfile?.ProfilePicture || '',
-        },
-        audio: v.audio
-            ? { id: v.audio.uuid, title: v.audio.name }
-            : null,
-        hashtags: v.hashtags?.map(h => h.tag) || [],
-        likesCount: v.likes?.length || 0,
-        viewsCount: v.views?.length || 0,
-        shareCount: v.shares?.length || 0,
-    }));
-
-    return {
-        data: formatted,
-        total: formatted.length,
-    };
-}
 
 
 
