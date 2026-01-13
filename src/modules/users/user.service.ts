@@ -1021,6 +1021,7 @@ export class UserService {
       .leftJoinAndSelect('video.hashtags', 'hashtags')
       .leftJoinAndSelect('video.likes', 'likes')
       .leftJoinAndSelect('video.views', 'views')
+      .leftJoinAndSelect('views.user', 'viewUser')
       .leftJoinAndSelect('video.shares', 'shares')
       .leftJoinAndSelect('video.comments', 'comments')
       .leftJoinAndSelect('likes.user', 'likeUser')
@@ -1037,9 +1038,11 @@ export class UserService {
       .leftJoinAndSelect('video.hashtags', 'hashtags')
       .leftJoinAndSelect('video.likes', 'likes')
       .leftJoinAndSelect('video.views', 'views')
+      .leftJoinAndSelect('views.user', 'viewUser')
       .leftJoinAndSelect('video.shares', 'shares')
       .leftJoinAndSelect('likes.user', 'likeUser')
       .leftJoinAndSelect('video.comments', 'comments')
+
       .leftJoin('video.mentions', 'mention')
       .where('mention.id = :userId', { userId })
       .andWhere('video.type != :type', { type: 'story' })
@@ -1054,6 +1057,7 @@ export class UserService {
     const formattedVideos = videos.map(video => ({
       ...video,
       isLiked: video.likes?.some(like => like.user?.id === reqSenderUserId) || false,
+      isViewed: video.views?.some(view => view.user?.id === reqSenderUserId) || false,
       likesCount: video.likes?.length || 0,
       commentsCount: video.comments?.length || 0,
       viewsCount: video.views?.length || 0,
