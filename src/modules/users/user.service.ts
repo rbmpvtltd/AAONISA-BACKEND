@@ -952,6 +952,132 @@ export class UserService {
     return { success: true, userProfile: user };
   }
 
+  // async getProfileByUsername(username: string, reqSenderUserId: string) {
+  //   console.log('🔍 getProfileByUsername called for:', username);
+
+  //   // Step 1: Get user info with profile
+  //   const user = await this.userRepository
+  //     .createQueryBuilder('user')
+  //     .leftJoinAndSelect('user.userProfile', 'userProfile')
+  //     .where('user.username = :username', { username })
+  //     .getOne();
+
+  //   if (!user) {
+  //     throw new NotFoundException('User not found');
+  //   }
+
+  //   const userId = user.id;
+  //   console.log(' User found:', userId, user.username);
+
+  //   // Step 2: Followers (who follows this user)
+  //   const followers = await this.followRepository
+  //     .createQueryBuilder('follow')
+  //     .leftJoin('follow.follower', 'follower')
+  //     .leftJoin('follower.userProfile', 'followerProfile')
+  //     .select([
+  //       'follower.id AS id',
+  //       'follower.username AS username',
+  //       'followerProfile.name AS name',
+  //       'followerProfile.ProfilePicture AS ProfilePicture'
+  //     ])
+  //     .where('follow.followingId = :userId', { userId })
+  //     .getRawMany();
+  //   // Step 3: Followings (whom this user follows)
+  //   const followings = await this.followRepository
+  //     .createQueryBuilder('follow')
+  //     .leftJoin('follow.following', 'following')
+  //     .leftJoin('following.userProfile', 'followingProfile')
+  //     .select([
+  //       'following.id AS id',
+  //       'following.username AS username',
+  //       'followingProfile.name AS name',
+  //       'followingProfile.ProfilePicture AS ProfilePicture'
+  //     ])
+  //     .where('follow.followerId = :userId', { userId })
+  //     .getRawMany();
+
+  //   const myFollowings = await this.followRepository
+  //     .createQueryBuilder('follow')
+  //     .select('follow.followingId', 'followingId')
+  //     .where('follow.followerId = :reqSenderUserId', { reqSenderUserId })
+  //     .getRawMany();
+
+  //   const myFollowingSet = new Set(
+  //     myFollowings.map(f => f.followingId)
+  //   );
+  //   const followersWithFlag = followers.map(follower => ({
+  //     ...follower,
+  //     followedByMe: myFollowingSet.has(follower.id)
+  //   }));
+  //   const followingsWithFlag = followings.map(following => ({
+  //     ...following,
+  //     followedByMe: myFollowingSet.has(following.id)
+  //   }));
+  //   console.log('Followings:', followingsWithFlag);
+  //   // Step 4: Fetch user’s videos
+  //   const videos = await this.videoRepository
+  //     .createQueryBuilder('video')
+  //     .leftJoinAndSelect('video.audio', 'audio')
+  //     .leftJoinAndSelect('video.hashtags', 'hashtags')
+  //     .leftJoinAndSelect('video.likes', 'likes')
+  //     .leftJoinAndSelect('video.views', 'views')
+  //     .leftJoinAndSelect('views.user', 'viewUser')
+  //     .leftJoinAndSelect('video.shares', 'shares')
+  //     .leftJoinAndSelect('video.comments', 'comments')
+  //     .leftJoinAndSelect('likes.user', 'likeUser')
+  //     .where('video.user_id = :userId', { userId })
+  //     .andWhere('video.type != :type', { type: 'story' })
+  //     .orderBy('video.created_at', 'DESC')
+  //     .getMany();
+
+  //   const mentionedVideos = await this.videoRepository
+  //     .createQueryBuilder('video')
+  //     .leftJoinAndSelect('video.user_id', 'owner') // video owner
+  //     .leftJoinAndSelect('owner.userProfile', 'ownerProfile')
+  //     .leftJoinAndSelect('video.audio', 'audio')
+  //     .leftJoinAndSelect('video.hashtags', 'hashtags')
+  //     .leftJoinAndSelect('video.likes', 'likes')
+  //     .leftJoinAndSelect('video.views', 'views')
+  //     .leftJoinAndSelect('views.user', 'viewUser')
+  //     .leftJoinAndSelect('video.shares', 'shares')
+  //     .leftJoinAndSelect('likes.user', 'likeUser')
+  //     .leftJoinAndSelect('video.comments', 'comments')
+
+  //     .leftJoin('video.mentions', 'mention')
+  //     .where('mention.id = :userId', { userId })
+  //     .andWhere('video.type != :type', { type: 'story' })
+  //     .orderBy('video.created_at', 'DESC')
+  //     .getMany();
+
+  //   console.log('🎥 Videos found:', videos.length);
+  //   console.log('🎥 Mentioned videos found:', mentionedVideos.length);
+  //   console.log('📊 Followers count:', followers.length);
+  //   console.log('📊 Followings count:', followings.length);
+
+  //   const formattedVideos = videos.map(video => ({
+  //     ...video,
+  //     isLiked: video.likes?.some(like => like.user?.id === reqSenderUserId) || false,
+  //     isViewed: video.views?.some(view => view.user?.id === reqSenderUserId) || false,
+  //     likesCount: video.likes?.length || 0,
+  //     commentsCount: video.comments?.length || 0,
+  //     viewsCount: video.views?.length || 0,
+  //     sharesCount: video.shares?.length || 0
+  //   }));
+  //   // Step 4: Final response
+  //   return {
+  //     id: user.id,
+  //     username: user.username,
+  //     email: user.email,
+  //     phone_no: user.phone_no,
+  //     role: user.role,
+  //     userProfile: user.userProfile,
+  //     followersWithFlag,
+  //     followingsWithFlag,
+  //     videos: formattedVideos,
+  //     mentionedVideos
+  //   };
+  // }
+
   async getProfileByUsername(username: string, reqSenderUserId: string) {
     console.log('🔍 getProfileByUsername called for:', username);
 
@@ -967,7 +1093,7 @@ export class UserService {
     }
 
     const userId = user.id;
-    console.log(' User found:', userId, user.username);
+    console.log('✅ User found:', userId, user.username);
 
     // Step 2: Followers (who follows this user)
     const followers = await this.followRepository
@@ -982,6 +1108,7 @@ export class UserService {
       ])
       .where('follow.followingId = :userId', { userId })
       .getRawMany();
+
     // Step 3: Followings (whom this user follows)
     const followings = await this.followRepository
       .createQueryBuilder('follow')
@@ -996,25 +1123,45 @@ export class UserService {
       .where('follow.followerId = :userId', { userId })
       .getRawMany();
 
+    // Get all users that reqSenderUserId follows
     const myFollowings = await this.followRepository
       .createQueryBuilder('follow')
       .select('follow.followingId', 'followingId')
       .where('follow.followerId = :reqSenderUserId', { reqSenderUserId })
       .getRawMany();
 
+    // Get all users that follow reqSenderUserId (for followsMe flag)
+    const myFollowers = await this.followRepository
+      .createQueryBuilder('follow')
+      .select('follow.followerId', 'followerId')
+      .where('follow.followingId = :reqSenderUserId', { reqSenderUserId })
+      .getRawMany();
+
     const myFollowingSet = new Set(
       myFollowings.map(f => f.followingId)
     );
+
+    const myFollowersSet = new Set(
+      myFollowers.map(f => f.followerId)
+    );
+
+    // Add both flags: followedByMe AND followsMe
     const followersWithFlag = followers.map(follower => ({
       ...follower,
-      followedByMe: myFollowingSet.has(follower.id)
+      followedByMe: myFollowingSet.has(follower.id),
+      followsMe: myFollowersSet.has(follower.id)  //  CORRECT: Check if follower follows ME
     }));
+
     const followingsWithFlag = followings.map(following => ({
       ...following,
-      followedByMe: myFollowingSet.has(following.id)
+      followedByMe: myFollowingSet.has(following.id),
+      followsMe: myFollowersSet.has(following.id)  //  CORRECT: Check if following follows ME back
     }));
-    console.log('Followings:', followingsWithFlag);
-    // Step 4: Fetch user’s videos
+
+    console.log('✅ Followings:', followingsWithFlag);
+    console.log('✅ Followers with flags:', followersWithFlag);
+
+    // Step 4: Fetch user's videos
     const videos = await this.videoRepository
       .createQueryBuilder('video')
       .leftJoinAndSelect('video.audio', 'audio')
@@ -1032,7 +1179,7 @@ export class UserService {
 
     const mentionedVideos = await this.videoRepository
       .createQueryBuilder('video')
-      .leftJoinAndSelect('video.user_id', 'owner') // video owner
+      .leftJoinAndSelect('video.user_id', 'owner')
       .leftJoinAndSelect('owner.userProfile', 'ownerProfile')
       .leftJoinAndSelect('video.audio', 'audio')
       .leftJoinAndSelect('video.hashtags', 'hashtags')
@@ -1042,7 +1189,6 @@ export class UserService {
       .leftJoinAndSelect('video.shares', 'shares')
       .leftJoinAndSelect('likes.user', 'likeUser')
       .leftJoinAndSelect('video.comments', 'comments')
-
       .leftJoin('video.mentions', 'mention')
       .where('mention.id = :userId', { userId })
       .andWhere('video.type != :type', { type: 'story' })
@@ -1063,7 +1209,8 @@ export class UserService {
       viewsCount: video.views?.length || 0,
       sharesCount: video.shares?.length || 0
     }));
-    // Step 4: Final response
+
+    // Step 5: Final response
     return {
       id: user.id,
       username: user.username,
