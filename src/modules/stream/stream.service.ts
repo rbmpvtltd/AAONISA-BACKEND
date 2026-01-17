@@ -936,21 +936,48 @@ export class VideoService {
             }
 
             // 2️⃣ Handle hashtags immediately
+            // const overlayHashtags = (createVideoDto.overlays || [])
+            //     .filter(o => o.text.startsWith('#'))
+            //     .map(o => o.text);
+            // const normalizedTags = [...overlayHashtags, ...(createVideoDto.hashtags || [])]
+            //     .map(t => t.trim().toLowerCase().replace(/^#/, ''));
+
+            // const existingTags = await this.hashtagRepo.find({
+            //     where: normalizedTags.map(tag => ({ tag })),
+            // });
+            // const existingTagNames = existingTags.map(t => t.tag);
+            // const newTags = normalizedTags
+            //     .filter(tag => !existingTagNames.includes(tag))
+            //     .map(tag => this.hashtagRepo.create({ tag }));
+
+            // const overallTags = [...new Set([...existingTags, ...newTags])];
+
             const overlayHashtags = (createVideoDto.overlays || [])
                 .filter(o => o.text.startsWith('#'))
                 .map(o => o.text);
-            const normalizedTags = [...overlayHashtags, ...(createVideoDto.hashtags || [])]
-                .map(t => t.trim().toLowerCase().replace(/^#/, ''));
 
-            const existingTags = await this.hashtagRepo.find({
-                where: normalizedTags.map(tag => ({ tag })),
-            });
-            const existingTagNames = existingTags.map(t => t.tag);
-            const newTags = normalizedTags
-                .filter(tag => !existingTagNames.includes(tag))
-                .map(tag => this.hashtagRepo.create({ tag }));
+            // ✅ Only process if hashtags actually exist
+            const hashtagsFromDto = createVideoDto.hashtags || [];
+            const allHashtagTexts = [...overlayHashtags, ...hashtagsFromDto];
 
-            const overallTags = [...new Set([...existingTags, ...newTags])];
+            let overallTags: Hashtag[] = [];
+
+            if (allHashtagTexts.length > 0) {
+                const normalizedTags = allHashtagTexts
+                    .map(t => t.trim().toLowerCase().replace(/^#/, ''))
+                    .filter(tag => tag.length > 0); // empty strings remove karo
+
+                const existingTags = await this.hashtagRepo.find({
+                    where: normalizedTags.map(tag => ({ tag })),
+                });
+
+                const existingTagNames = existingTags.map(t => t.tag);
+                const newTags = normalizedTags
+                    .filter(tag => !existingTagNames.includes(tag))
+                    .map(tag => this.hashtagRepo.create({ tag }));
+
+                overallTags = [...new Set([...existingTags, ...newTags])];
+            }
 
             // 3️⃣ Create a pending video entry
             const video = this.videoRepository.create({
@@ -958,7 +985,7 @@ export class VideoService {
                 caption: createVideoDto.caption,
                 type: createVideoDto.type || VideoType.reels,
                 user_id: user,
-                hashtags: overallTags,
+                hashtags: overallTags.length > 0 ? overallTags : undefined,
                 mentions: mentionedUsers,
                 status: 'pending',
                 videoUrl: filename,
