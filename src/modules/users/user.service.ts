@@ -9,7 +9,7 @@ import * as crypto from 'crypto';
 import * as sharp from 'sharp';
 
 import { UserProfile } from './entities/user-profile.entity';
-import { User, UserRole } from './entities/user.entity';
+import { User, UserRole, UserStatus } from './entities/user.entity';
 import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/create-user.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto'
 import { UpdateUserEmail, UpdateUserPhone } from './dto/update-user.dto'
@@ -23,6 +23,8 @@ import { TokenService } from '../tokens/token.service';
 import { extname } from 'path';
 import { Follow } from '../follows/entities/follow.entity';
 import { Video } from '../stream/entities/video.entity';
+import { Block } from './entities/block.entity';
+
 const fs = require('fs');
 const path = require('path');
 @Injectable()
@@ -35,6 +37,7 @@ export class UserService {
     @InjectRepository(Follow) // ✅ Add this line
     private readonly followRepository: Repository<Follow>,
     @InjectRepository(Video) private videoRepository: Repository<Video>,
+    @InjectRepository(Block) private blockRepository: Repository<Block>,
     private readonly authService: AuthService,
     private readonly otpService: OtpService,
     private readonly emailService: EmailService,
@@ -1086,6 +1089,7 @@ export class UserService {
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.userProfile', 'userProfile')
       .where('user.username = :username', { username })
+      .andWhere('user.status = :status', { status: UserStatus.ACTIVE })
       .getOne();
 
     if (!user) {
@@ -1094,34 +1098,73 @@ export class UserService {
 
     const userId = user.id;
     console.log('✅ User found:', userId, user.username);
+    // Check if profile owner has blocked the requester
+    const isBlocked = await this.blockRepository.findOne({
+      where: {
+        blockedBy: { id: user.id },          // profile owner
+        blockedUser: { id: reqSenderUserId } // requester
+      }
+    });
+
+    if (isBlocked) {
+      throw new NotFoundException('User not found');
+    }
 
     // Step 2: Followers (who follows this user)
     const followers = await this.followRepository
-      .createQueryBuilder('follow')
-      .leftJoin('follow.follower', 'follower')
-      .leftJoin('follower.userProfile', 'followerProfile')
-      .select([
-        'follower.id AS id',
-        'follower.username AS username',
-        'followerProfile.name AS name',
-        'followerProfile.ProfilePicture AS ProfilePicture'
-      ])
-      .where('follow.followingId = :userId', { userId })
-      .getRawMany();
+  .createQueryBuilder('follow')
+  .leftJoin('follow.follower', 'follower')
+  .leftJoin('follower.userProfile', 'followerProfile')
+  .select([
+    'follower.id AS id',
+    'follower.username AS username',
+    'followerProfile.name AS name',
+    'followerProfile.ProfilePicture AS ProfilePicture'
+  ])
+  .where('follow.followingId = :userId', { userId })
+  .andWhere('follower.status = :status', { status: UserStatus.ACTIVE })
+  .andWhere(qb => {
+    const subQuery = qb
+      .subQuery()
+      .select('1')
+      .from('block', 'b')
+      .where('b.blockedById = follower.id')
+      .andWhere('b.blockedUserId = :reqSenderUserId')
+      .getQuery();
+
+    return `NOT EXISTS ${subQuery}`;
+  })
+  .setParameter('reqSenderUserId', reqSenderUserId)
+  .getRawMany();
+
 
     // Step 3: Followings (whom this user follows)
     const followings = await this.followRepository
-      .createQueryBuilder('follow')
-      .leftJoin('follow.following', 'following')
-      .leftJoin('following.userProfile', 'followingProfile')
-      .select([
-        'following.id AS id',
-        'following.username AS username',
-        'followingProfile.name AS name',
-        'followingProfile.ProfilePicture AS ProfilePicture'
-      ])
-      .where('follow.followerId = :userId', { userId })
-      .getRawMany();
+  .createQueryBuilder('follow')
+  .leftJoin('follow.following', 'following')
+  .leftJoin('following.userProfile', 'followingProfile')
+  .select([
+    'following.id AS id',
+    'following.username AS username',
+    'followingProfile.name AS name',
+    'followingProfile.ProfilePicture AS ProfilePicture'
+  ])
+  .where('follow.followerId = :userId', { userId })
+  .andWhere('following.status = :status', { status: UserStatus.ACTIVE })
+  .andWhere(qb => {
+    const subQuery = qb
+      .subQuery()
+      .select('1')
+      .from('block', 'b')
+      .where('b.blockedById = following.id')
+      .andWhere('b.blockedUserId = :reqSenderUserId')
+      .getQuery();
+
+    return `NOT EXISTS ${subQuery}`;
+  })
+  .setParameter('reqSenderUserId', reqSenderUserId)
+  .getRawMany();
+
 
     // Get all users that reqSenderUserId follows
     const myFollowings = await this.followRepository
@@ -1225,18 +1268,35 @@ export class UserService {
     };
   }
 
-  async searchUsers(query?: string) {
-    const users = await this.userRepository.find({
-      where: { username: Like(`%${query}%`), },
-      relations: ['userProfile']
-    });
+  async searchUsers(query: string, reqSenderUserId: string) {
+    const users = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.userProfile', 'userProfile')
 
-    if (!users) {
-      console.log('No users found');
-    }
+      .where('user.username ILIKE :query', { query: `%${query}%` })
 
-    return users
+      .andWhere('user.status = :status', {
+        status: UserStatus.ACTIVE,
+      })
+
+      .andWhere(qb => {
+        const subQuery = qb
+          .subQuery()
+          .select('1')
+          .from('block', 'block')
+          .where('block.blockedById = user.id')
+          .andWhere('block.blockedUserId = :reqSenderUserId')
+          .getQuery();
+
+        return `NOT EXISTS ${subQuery}`;
+      })
+      .setParameter('reqSenderUserId', reqSenderUserId)
+      .getMany();
+
+    return users;
   }
+
+
 
   async updateEmailOtp(dto) {
     const user = await this.userRepository.findOne({ where: { email: dto.email } });
@@ -1346,6 +1406,21 @@ export class UserService {
 
   async getFollowState() {
 
+  }
+
+  async blockUserStatusByAdmin(userId) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    user.status = UserStatus.BLOCKED_BY_ADMIN;
+    await this.userRepository.save(user);
+    return { message: 'Status updated successfully', success: true };
+  }
+  async unblockUserStatusByAdmin(userId) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    user.status = UserStatus.ACTIVE;
+    await this.userRepository.save(user);
+    return { message: 'Status updated successfully', success: true };
   }
 }
 
