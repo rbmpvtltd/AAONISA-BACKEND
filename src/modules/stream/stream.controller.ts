@@ -145,13 +145,13 @@ export class VideoController {
     @Query('limit') limit: string,
     @Req() req: Request,
   ) {
-    const user = req.user as { userId?: string };
+    const user = req.user as { userId: string };
     if (!user || !user.userId) {
       throw new BadRequestException('Invalid or missing user ID in token.');
     }
 
     const limitNum = parseInt(limit, 10) || 10;
-    return this.videoService.getExploreVideosWithMain(videoId, limitNum);
+    return this.videoService.getExploreVideosWithMain(user.userId,videoId, limitNum);
   }
 
   @Delete('/delete/:id')

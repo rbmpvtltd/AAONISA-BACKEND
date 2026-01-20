@@ -8,7 +8,7 @@ import * as ffmpeg from 'fluent-ffmpeg';
 import * as path from 'path';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import { User, UserRole } from '../users/entities/user.entity';
+import { User, UserRole, UserStatus } from '../users/entities/user.entity';
 import { Hashtag } from './entities/hashtag.entity';
 import { Request, Response } from 'express';
 import { AppGateway } from 'src/app.gateway';
@@ -1693,7 +1693,33 @@ export class VideoService {
             .leftJoinAndSelect('video.comments', 'comments')
             .leftJoinAndSelect('video.views', 'views')
             .leftJoinAndSelect('video.shares', 'shares')
-            .where('video.type != :storyType', { storyType: 'story' });
+            .where('video.type != :storyType', { storyType: 'story' })
+            .andWhere('user.status = :activeStatus', {
+                activeStatus: UserStatus.ACTIVE,
+            })
+            .andWhere(qb => {
+                const subQuery = qb.subQuery()
+                    .select('1')
+                    .from('block', 'b')
+                    .where('b.blockedById = user.id')
+                    .andWhere('b.blockedUserId = :userId')
+                    .getQuery();
+
+                return `NOT EXISTS ${subQuery}`;
+            })
+
+            // ❌ maine video owner ko block kiya ho
+            .andWhere(qb => {
+                const subQuery = qb.subQuery()
+                    .select('1')
+                    .from('block', 'b2')
+                    .where('b2.blockedById = :userId')
+                    .andWhere('b2.blockedUserId = user.id')
+                    .getQuery();
+
+                return `NOT EXISTS ${subQuery}`;
+            })
+            .setParameter('userId', userId);
 
         /* ================= FEED TYPE LOGIC ================= */
         if (feedType === 'followings') {
@@ -1783,6 +1809,7 @@ export class VideoService {
 
 
     async getExploreVideosWithMain(
+        reqSenderUserId: string,
         videoId: string,
         limit = 10
     ) {
@@ -1800,7 +1827,34 @@ export class VideoService {
             .leftJoinAndSelect('video.shares', 'shares')
             .where('video.uuid = :videoId', { videoId })
             .andWhere('video.type IN (:...types)', { types: ['reels', 'news'] })
+
+            // ✅ ACTIVE USER ONLY
+            .andWhere('videoUser.status = :activeStatus', {
+                activeStatus: UserStatus.ACTIVE,
+            })
+
+            // ❌ BLOCK RULES
+            .andWhere(qb => {
+                const sub = qb.subQuery()
+                    .select('1')
+                    .from('block', 'b')
+                    .where('b.blockedById = videoUser.id')
+                    .andWhere('b.blockedUserId = :reqSenderUserId')
+                    .getQuery();
+                return `NOT EXISTS ${sub}`;
+            })
+            .andWhere(qb => {
+                const sub = qb.subQuery()
+                    .select('1')
+                    .from('block', 'b2')
+                    .where('b2.blockedById = :reqSenderUserId')
+                    .andWhere('b2.blockedUserId = videoUser.id')
+                    .getQuery();
+                return `NOT EXISTS ${sub}`;
+            })
+            .setParameter('reqSenderUserId', reqSenderUserId)
             .getOne();
+
 
         if (!mainVideo) {
             return { data: [], total: 0 };
@@ -1809,9 +1863,33 @@ export class VideoService {
         // 2️⃣ Count eligible videos (excluding main)
         const totalCount = await this.videoRepository
             .createQueryBuilder('video')
+            .leftJoin('video.user_id', 'videoUser')
             .where('video.type IN (:...types)', { types: ['reels', 'news'] })
             .andWhere('video.uuid != :videoId', { videoId })
+            .andWhere('videoUser.status = :activeStatus', {
+                activeStatus: UserStatus.ACTIVE,
+            })
+            .andWhere(qb => {
+                const sub = qb.subQuery()
+                    .select('1')
+                    .from('block', 'b')
+                    .where('b.blockedById = videoUser.id')
+                    .andWhere('b.blockedUserId = :reqSenderUserId')
+                    .getQuery();
+                return `NOT EXISTS ${sub}`;
+            })
+            .andWhere(qb => {
+                const sub = qb.subQuery()
+                    .select('1')
+                    .from('block', 'b2')
+                    .where('b2.blockedById = :reqSenderUserId')
+                    .andWhere('b2.blockedUserId = videoUser.id')
+                    .getQuery();
+                return `NOT EXISTS ${sub}`;
+            })
+            .setParameter('reqSenderUserId', reqSenderUserId)
             .getCount();
+
 
         if (totalCount === 0) {
             return { data: [mainVideo], total: 1 };
@@ -1834,13 +1912,39 @@ export class VideoService {
             .leftJoinAndSelect('likes.user', 'likeUser')
             .leftJoinAndSelect('video.views', 'views')
             .leftJoinAndSelect('video.comments', 'comments')
-
             .leftJoinAndSelect('video.shares', 'shares')
             .where('video.type IN (:...types)', { types: ['reels', 'news'] })
             .andWhere('video.uuid != :videoId', { videoId })
+
+            // ✅ ACTIVE USER ONLY
+            .andWhere('videoUser.status = :activeStatus', {
+                activeStatus: UserStatus.ACTIVE,
+            })
+
+            // ❌ BLOCK RULES
+            .andWhere(qb => {
+                const sub = qb.subQuery()
+                    .select('1')
+                    .from('block', 'b')
+                    .where('b.blockedById = videoUser.id')
+                    .andWhere('b.blockedUserId = :reqSenderUserId')
+                    .getQuery();
+                return `NOT EXISTS ${sub}`;
+            })
+            .andWhere(qb => {
+                const sub = qb.subQuery()
+                    .select('1')
+                    .from('block', 'b2')
+                    .where('b2.blockedById = :reqSenderUserId')
+                    .andWhere('b2.blockedUserId = videoUser.id')
+                    .getQuery();
+                return `NOT EXISTS ${sub}`;
+            })
+            .setParameter('reqSenderUserId', reqSenderUserId)
             .skip(randomOffset)
             .take(limit - 1)
             .getMany();
+
 
         // 5️⃣ Combine
         const videos = [mainVideo, ...otherVideos];

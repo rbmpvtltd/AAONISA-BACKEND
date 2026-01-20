@@ -25,6 +25,12 @@ export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
 }
+export enum UserStatus {
+  ACTIVE = 'active',
+  BLOCKED_BY_ADMIN = 'blocked_by_admin',
+  DEACTIVATED = 'deactivated',
+  DELETED = 'deleted',
+}
 
 @Entity('users')
 @Check(`"email" IS NOT NULL OR "phone_no" IS NOT NULL`)
@@ -32,7 +38,7 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({unique: true})
+  @Column({ unique: true })
   username: string;
 
   @Column({ unique: true, nullable: true })
@@ -111,6 +117,11 @@ export class User {
   messagesSent: Chat[];
 
   @OneToMany(() => Report, (report) => report.user)
-reports: Report[];
-
+  reports: Report[];
+  @Column({
+    type: 'enum',
+    enum: UserStatus,
+    default: UserStatus.ACTIVE,
+  })
+  status: UserStatus;
 }
