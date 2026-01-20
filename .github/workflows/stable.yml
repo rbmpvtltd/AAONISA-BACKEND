@@ -42,10 +42,19 @@ jobs:
             pm2 stop stable-backend-worker || true
             
             # Build project
-            npm run build || { echo 'Build failed'; exit 1; }
-            ls dist/src/main.js || { echo "Build output missing"; exit 1; }
+            echo "Running build..."
+            npm run build || exit 1
+
+            echo "Checking build output..."
+            for i in {1..10}; do
+              [ -f dist/src/main.js ] && break
+              echo "Waiting for build output..."
+              sleep 1
+            done
+            [ -f dist/src/main.js ] || { echo "Build output missing"; exit 1; }
             # Restart PM2 processes for stable
             pm2 reload stable-backend-api || { echo 'PM2 stable-backend-api restart failed'; exit 1; }
             pm2 reload stable-backend-worker || { echo 'PM2 stable-backend-worker restart failed'; exit 1; }
 
             echo "Stable deployment finished successfully ✅"
+            pm2 save
