@@ -37,7 +37,7 @@ import { Comment } from "./modules/comments/entities/comment.entity";
         enableReadyCheck: false,
       },
     }),
-
+    // migration and entity automate
     TypeOrmModule.forRootAsync({
       useFactory: () => {
         const { entities, migrations, ...rest } = AppDataSource.options;

@@ -188,8 +188,10 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Get('search')
-  async searchUsers(@Query('q') query: string) {
-    const users = await this.userService.searchUsers(query);
+  async searchUsers(@Query('q') query: string,@Req() req) {
+    const payload = req.user;
+    const userId = payload?.sub || payload?.id || payload?.userId;
+    const users = await this.userService.searchUsers(query,userId);
     return users;
   }
 
@@ -231,5 +233,18 @@ export class UserController {
     const payload = req.user;
     const userId = payload?.sub || payload?.id || payload?.userId;
     return this.blockService.getBlockedUsers(userId);
+  }
+
+  @Get('admin-block/:userId')
+  async blockUserStatusByAdmin(
+    @Param('userId') userId: string,
+  ) {
+    return this.userService.blockUserStatusByAdmin(userId);
+  }
+  @Get('admin-unblock/:userId')
+  async unblockUserStatusByAdmin(
+    @Param('userId') userId: string,
+  ) {
+    return this.userService.unblockUserStatusByAdmin(userId);
   }
 }

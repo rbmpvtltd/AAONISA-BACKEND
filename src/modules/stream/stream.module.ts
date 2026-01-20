@@ -15,8 +15,9 @@ import { TokenModule } from '../tokens/token.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { StoryDeleteModule } from './story-delete.module';
 import { VideoQueueProcessor } from './video.quere.processor';
+import { Block } from '../users/entities/block.entity';
 @Module({
-  imports: [TypeOrmModule.forFeature([Video, Audio,User,Hashtag,Follow]),UserProfileModule,SharedModule,TokenModule,NotificationModule,StoryDeleteModule,
+  imports: [TypeOrmModule.forFeature([Video, Audio,User,Hashtag,Follow,Block]),UserProfileModule,SharedModule,TokenModule,NotificationModule,StoryDeleteModule,
   BullModule.registerQueue({
             name : 'videoProcessing'
         }),],
