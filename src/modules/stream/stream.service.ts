@@ -1369,7 +1369,7 @@ export class VideoService {
         // Logged-in user
         const user = await this.userRepository.findOne({
             where: { id: userId },
-            relations: ["userProfile", "videos"]
+            relations: ["userProfile", "videos","videos.views"]
         });
 
         if (!user) throw new NotFoundException("User not found");
@@ -1386,7 +1386,7 @@ export class VideoService {
         // Find whom user is following
         const following = await this.followRepository.find({
             where: { follower: { id: userId } },
-            relations: ["following", "following.userProfile", "following.videos"]
+            relations: ["following", "following.userProfile", "following.videos", "following.videos.views"]
         });
 
         // Prepare all story users (self + following)
