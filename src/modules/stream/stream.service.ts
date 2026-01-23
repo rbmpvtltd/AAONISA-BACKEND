@@ -1400,7 +1400,7 @@ export class VideoService {
                     id: story.uuid,
                     videoUrl: story.videoUrl,
                     duration: story.duration || 15,
-                    viewed: false,
+                    viewed: story.views.some(v => v.user.id === userId),
                     thumbnailUrl: story.thumbnailUrl,
                     created_at: story.created_at
                 }))
@@ -1423,7 +1423,7 @@ export class VideoService {
                         id: story.uuid,
                         videoUrl: story.videoUrl,
                         duration: story.duration || 15,
-                        viewed: false,
+                        viewed: story.views.some(v => v.user.id === userId),
                         thumbnailUrl: story.thumbnailUrl,
                         created_at: story.created_at
                     }))
