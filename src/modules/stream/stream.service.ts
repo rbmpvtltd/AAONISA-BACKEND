@@ -2047,6 +2047,7 @@ export class VideoService {
                 : null,
             hashtags: v.hashtags?.map(h => h.tag) || [],
             likesCount: v.likes?.length || 0,
+            commentsCount: v.comments?.length || 0,
             viewsCount: v.views?.length || 0,
             shareCount: v.shares?.length || 0,
         }));

@@ -13,7 +13,7 @@ export class ShareService {
 
     @InjectRepository(Video)
     private readonly videoRepository: Repository<Video>,
-  ) {}
+  ) { }
 
   /**
    * Reel share karna (same reel, same users multiple times allowed)
