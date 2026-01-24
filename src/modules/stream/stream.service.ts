@@ -1365,83 +1365,162 @@ export class VideoService {
         return this.videoRepository.save(video);
     }
 
+    // async getAllStories(userId: string) {
+    //     // Logged-in user
+    //     const user = await this.userRepository.findOne({
+    //         where: { id: userId },
+    //         relations: ["userProfile", "videos","videos.views","videos.views.user"]
+    //     });
+    //     console.log(JSON.stringify(user))
+    //     if (!user) throw new NotFoundException("User not found");
+
+    //     // Calculate 24-hour cutoff time
+    //     const cutoffTime = new Date();
+    //     cutoffTime.setHours(cutoffTime.getHours() - 24);
+
+    //     // User ki khud ki stories (24h ke andar)
+    //     const selfStories = user.videos
+    //         .filter(v => v.type === "story" && new Date(v.created_at) >= cutoffTime)
+    //         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    //     // Find whom user is following
+    //     const following = await this.followRepository.find({
+    //         where: { follower: { id: userId } },
+    //         relations: ["following", "following.userProfile", "following.videos", "following.videos.views", "following.videos.views.user"]
+    //     });
+    //     console.log(JSON.stringify(following))
+    //     // Prepare all story users (self + following)
+    //     const storyUsers = [
+    //         {
+    //             username: user.username,
+    //             profilePic: user.userProfile?.ProfilePicture || "",
+    //             owner: user.id,
+    //             self: true,
+    //             stories: selfStories.map(story => ({
+    //                 id: story.uuid,
+    //                 videoUrl: story.videoUrl,
+    //                 duration: story.duration || 15,
+    //                 viewed: story.views?.some(v => v.user?.id === userId) ?? false,
+    //                 thumbnailUrl: story.thumbnailUrl,
+    //                 created_at: story.created_at
+    //             }))
+    //         },
+    //         ...following.map(f => {
+    //             const u = f.following;
+    //             const userStories = u.videos
+    //                 .filter(v => v.type === "story" && new Date(v.created_at) >= cutoffTime)
+    //                 .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    //             console.log("Story durations: ", selfStories.map(s => s.duration));
+
+
+    //             return {
+    //                 username: u.username,
+    //                 profilePic: u.userProfile?.ProfilePicture || "",
+    //                 owner: u.id,
+    //                 self: false,
+    //                 stories: userStories.map(story => ({
+    //                     id: story.uuid,
+    //                     videoUrl: story.videoUrl,
+    //                     duration: story.duration || 15,
+    //                     viewed: story.views?.some(v => v.user?.id === userId) ?? false,
+    //                     thumbnailUrl: story.thumbnailUrl,
+    //                     created_at: story.created_at
+    //                 }))
+    //             };
+    //         })
+    //     ];
+
+    //     // Filter out users with no valid stories
+    //     const validUsers = storyUsers.filter(user => user.stories.length > 0);
+
+    //     // Sort users by latest story time (newest first)
+    //     validUsers.sort((a, b) => {
+    //         const latestA = Math.max(...a.stories.map(s => new Date(s.created_at).getTime()));
+    //         const latestB = Math.max(...b.stories.map(s => new Date(s.created_at).getTime()));
+    //         return latestB - latestA;
+    //     });
+
+    //     return validUsers;
+    // }
+
+    private mapStories(videos: any[], userId: string) {
+        return videos.map(video => ({
+            id: video.uuid,
+            videoUrl: video.videoUrl,
+            duration: video.duration ?? 15,
+            viewed: video.views?.some(v => v.user?.id === userId) ?? false,
+            thumbnailUrl: video.thumbnailUrl,
+            created_at: video.created_at
+        }));
+    }
     async getAllStories(userId: string) {
-        // Logged-in user
+        const cutoffTime = new Date();
+        cutoffTime.setHours(cutoffTime.getHours() - 24);
+
+        /** 1️⃣ Get logged-in user basic info */
         const user = await this.userRepository.findOne({
             where: { id: userId },
-            relations: ["userProfile", "videos"]
+            relations: ["userProfile"]
         });
 
         if (!user) throw new NotFoundException("User not found");
 
-        // Calculate 24-hour cutoff time
-        const cutoffTime = new Date();
-        cutoffTime.setHours(cutoffTime.getHours() - 24);
+        /** 2️⃣ Self stories (DB filtered) */
+        const selfStories = await this.videoRepository
+            .createQueryBuilder("video")
+            .leftJoinAndSelect("video.views", "views")
+            .leftJoinAndSelect("views.user", "viewUser")
+            .where("video.user_id = :userId", { userId })
+            .andWhere("video.type = :type", { type: "story" })
+            .andWhere("video.created_at >= :cutoffTime", { cutoffTime })
+            .orderBy("video.created_at", "DESC")
+            .getMany();
 
-        // User ki khud ki stories (24h ke andar)
-        const selfStories = user.videos
-            .filter(v => v.type === "story" && new Date(v.created_at) >= cutoffTime)
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        /** 3️⃣ Following users with their stories */
+        const followings = await this.followRepository
+            .createQueryBuilder("follow")
+            .innerJoin("follow.follower", "follower")
+            .innerJoinAndSelect("follow.following", "u")
+            .leftJoinAndSelect("u.userProfile", "profile")
+            .leftJoinAndSelect(
+                "u.videos",
+                "video",
+                "video.type = :type AND video.created_at >= :cutoffTime",
+                { type: "story", cutoffTime }
+            )
+            .leftJoinAndSelect("video.views", "views")
+            .leftJoinAndSelect("views.user", "viewUser")
+            .where("follower.id = :userId", { userId })
+            .getMany();
 
-        // Find whom user is following
-        const following = await this.followRepository.find({
-            where: { follower: { id: userId } },
-            relations: ["following", "following.userProfile", "following.videos"]
-        });
 
-        // Prepare all story users (self + following)
+        /** 4️⃣ Shape final response */
         const storyUsers = [
             {
                 username: user.username,
-                profilePic: user.userProfile?.ProfilePicture || "",
+                profilePic: user.userProfile?.ProfilePicture ?? "",
                 owner: user.id,
                 self: true,
-                stories: selfStories.map(story => ({
-                    id: story.uuid,
-                    videoUrl: story.videoUrl,
-                    duration: story.duration || 15,
-                    viewed: false,
-                    thumbnailUrl: story.thumbnailUrl,
-                    created_at: story.created_at
-                }))
+                stories: this.mapStories(selfStories, userId)
             },
-            ...following.map(f => {
-                const u = f.following;
-                const userStories = u.videos
-                    .filter(v => v.type === "story" && new Date(v.created_at) >= cutoffTime)
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-                console.log("Story durations: ", selfStories.map(s => s.duration));
-
-
-                return {
-                    username: u.username,
-                    profilePic: u.userProfile?.ProfilePicture || "",
-                    owner: u.id,
-                    self: false,
-                    stories: userStories.map(story => ({
-                        id: story.uuid,
-                        videoUrl: story.videoUrl,
-                        duration: story.duration || 15,
-                        viewed: false,
-                        thumbnailUrl: story.thumbnailUrl,
-                        created_at: story.created_at
-                    }))
-                };
-            })
+            ...followings.map(f => ({
+                username: f.following.username,
+                profilePic: f.following.userProfile?.ProfilePicture ?? "",
+                owner: f.following.id,
+                self: false,
+                stories: this.mapStories(f.following.videos ?? [], userId)
+            }))
         ];
 
-        // Filter out users with no valid stories
-        const validUsers = storyUsers.filter(user => user.stories.length > 0);
-
-        // Sort users by latest story time (newest first)
-        validUsers.sort((a, b) => {
-            const latestA = Math.max(...a.stories.map(s => new Date(s.created_at).getTime()));
-            const latestB = Math.max(...b.stories.map(s => new Date(s.created_at).getTime()));
-            return latestB - latestA;
-        });
-
-        return validUsers;
+        /** 5️⃣ Remove empty + sort by latest story */
+        return storyUsers
+            .filter(u => u.stories.length > 0)
+            .sort((a, b) => {
+                const latestA = Math.max(...a.stories.map(s => +new Date(s.created_at)));
+                const latestB = Math.max(...b.stories.map(s => +new Date(s.created_at)));
+                return latestB - latestA;
+            });
     }
 
     // async getVideosFeed(
@@ -1968,6 +2047,7 @@ export class VideoService {
                 : null,
             hashtags: v.hashtags?.map(h => h.tag) || [],
             likesCount: v.likes?.length || 0,
+            commentsCount: v.comments?.length || 0,
             viewsCount: v.views?.length || 0,
             shareCount: v.shares?.length || 0,
         }));
