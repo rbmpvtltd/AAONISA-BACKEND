@@ -111,6 +111,7 @@ export class BookmarkService {
             where: { user: { id: userId } },
             relations: [
                 'reels',
+                'user',
                 'reels.likes',
                 'reels.comments',
                 'reels.views',
@@ -120,7 +121,7 @@ export class BookmarkService {
                 'reels.user_id.userProfile',
             ],
         });
-        console.log(bookmarks[0].reels[0].user_id.userProfile)
+        console.log("bookmarks ", bookmarks)
         const transformed = bookmarks.map(bookmark => ({
             id: bookmark.id,
             name: bookmark.name,
