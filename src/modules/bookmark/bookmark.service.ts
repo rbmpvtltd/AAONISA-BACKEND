@@ -111,6 +111,7 @@ export class BookmarkService {
             where: { user: { id: userId } },
             relations: [
                 'reels',
+                'user',
                 'reels.likes',
                 'reels.comments',
                 'reels.views',
