@@ -1865,6 +1865,7 @@ export class VideoService {
                 id: v.user_id.id,
                 username: v.user_id.username,
                 profilePic: v.user_id.userProfile?.ProfilePicture || '',
+                role: v.user_id.role || 'user'
             },
             audio: v.audio ? { id: v.audio.uuid, title: v.audio.name } : null,
             hashtags: v.hashtags?.map(h => h.tag) || [],
@@ -2041,6 +2042,7 @@ export class VideoService {
                 id: v.user_id.id,
                 username: v.user_id.username,
                 profilePic: v.user_id.userProfile?.ProfilePicture || '',
+                role: v.user_id.role || 'user',
             },
             audio: v.audio
                 ? { id: v.audio.uuid, title: v.audio.name }

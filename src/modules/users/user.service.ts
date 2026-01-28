@@ -1118,6 +1118,7 @@ export class UserService {
   .select([
     'follower.id AS id',
     'follower.username AS username',
+    'follower.role AS role',
     'followerProfile.name AS name',
     'followerProfile.ProfilePicture AS ProfilePicture'
   ])
@@ -1146,6 +1147,7 @@ export class UserService {
   .select([
     'following.id AS id',
     'following.username AS username',
+    'following.role AS role',
     'followingProfile.name AS name',
     'followingProfile.ProfilePicture AS ProfilePicture'
   ])
@@ -1175,10 +1177,10 @@ export class UserService {
 
     // Get all users that follow reqSenderUserId (for followsMe flag)
     const myFollowers = await this.followRepository
-      .createQueryBuilder('follow')
-      .select('follow.followerId', 'followerId')
-      .where('follow.followingId = :reqSenderUserId', { reqSenderUserId })
-      .getRawMany();
+  .createQueryBuilder('follow')
+  .where('follow.followingId = :reqSenderUserId', { reqSenderUserId })
+  .getRawMany();
+
 
     const myFollowingSet = new Set(
       myFollowings.map(f => f.followingId)
@@ -1192,21 +1194,20 @@ export class UserService {
     const followersWithFlag = followers.map(follower => ({
       ...follower,
       followedByMe: myFollowingSet.has(follower.id),
-      followsMe: myFollowersSet.has(follower.id)  //  CORRECT: Check if follower follows ME
+      followsMe: myFollowersSet.has(follower.id)
     }));
 
     const followingsWithFlag = followings.map(following => ({
       ...following,
       followedByMe: myFollowingSet.has(following.id),
-      followsMe: myFollowersSet.has(following.id)  //  CORRECT: Check if following follows ME back
+      followsMe: myFollowersSet.has(following.id) 
     }));
-
-    console.log('✅ Followings:', followingsWithFlag);
-    console.log('✅ Followers with flags:', followersWithFlag);
 
     // Step 4: Fetch user's videos
     const videos = await this.videoRepository
       .createQueryBuilder('video')
+      .leftJoin('video.user_id', 'owner')
+  .addSelect(['owner.id', 'owner.role'])
       .leftJoinAndSelect('video.audio', 'audio')
       .leftJoinAndSelect('video.hashtags', 'hashtags')
       .leftJoinAndSelect('video.likes', 'likes')
@@ -1219,7 +1220,7 @@ export class UserService {
       .andWhere('video.type != :type', { type: 'story' })
       .orderBy('video.created_at', 'DESC')
       .getMany();
-
+      
     const mentionedVideos = await this.videoRepository
       .createQueryBuilder('video')
       .leftJoinAndSelect('video.user_id', 'owner')

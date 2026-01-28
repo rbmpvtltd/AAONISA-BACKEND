@@ -94,7 +94,6 @@ export class ChatService {
             relations: ['user1', 'user1.userProfile', 'user2', 'user2.userProfile', 'messages', 'messages.sender', 'messages.sender.userProfile'],
             order: { created_at: 'DESC' },
         });
-
         return sessions
             .filter(session => session.user1 && session.user2)
             .map(session => {
@@ -110,7 +109,8 @@ export class ChatService {
                     otherUser: {
                         id: otherUser.id,
                         username: otherUser.username,
-                        profilePicture: otherUser.userProfile?.ProfilePicture || ''
+                        profilePicture: otherUser.userProfile?.ProfilePicture || '',
+                        role:otherUser.role || 'user',
                     },
                     createdAt: session.created_at,
                     latestMessage: latestMessage && latestMessage.sender
