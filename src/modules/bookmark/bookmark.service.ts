@@ -128,7 +128,8 @@ export class BookmarkService {
                 uuid: reel.uuid,
                 user: {
                     userProfile: reel.user_id.userProfile?.ProfilePicture ?? null,
-                    username: reel.user_id.username
+                    username: reel.user_id.username,
+                    role:reel.user_id.role || 'user'
                 },
 
                 title: reel.title,
